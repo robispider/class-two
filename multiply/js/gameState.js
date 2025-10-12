@@ -1,0 +1,27 @@
+// js/gameState.js
+export const gameState = {
+    gameActive: false,
+    currentLevel: 1,
+    currentStage: 1,
+    mode: 'stage',
+    score: 0,
+    streak: 0,
+    timeLimit: 15,
+    maxNumber: 10,
+    questionCount: 0,
+    correctCount: 0,
+    savedTime: 0,
+    bonusRemaining: 0,
+    isBonus: false,
+    sessionScore: 0,
+    levelRunScore: 0,
+    overallScore: 0,
+    mainAnswered: 0,
+    fixedMultiplier: 0,
+    performanceTracker: null,
+    questionGenerator: null,
+    controller: null,
+    currentQuestion: null,
+    questionData: null,
+    // UI elements will be managed in scenes
+};
