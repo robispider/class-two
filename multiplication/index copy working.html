@@ -1,0 +1,1203 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>গুণের অভিযান</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, user-scalable=no">
+    <script src="https://zimjs.org/cdn/1.3.2/createjs.js"></script>
+    <script type="module">
+        import zim from "https://zimjs.org/cdn/018/zim_game";
+        import {createStopwatch} from "./stopwatch.js";
+        import PerformanceTracker from "./performanceTracker.js";
+        import QuestionGenerator from "./questionGenerator.js";
+        import GameplayController from "./gameplayController.js";
+
+        const frame = new zim.Frame({
+            scaling: zim.FIT, width: 1024, height: 768,
+            outerColor: "#333333", ready: ready
+        });
+        frame.on("error", (e) => { zog("Frame initialization error:", e); });
+
+        function ready(frame, stage, width, height) {
+            const F = frame; const S = stage; const W = width; const H = height;
+
+            const uiColors = {
+                bgGradient: ["#A3D5E5", "#7A9AC9"],
+                panel: "#FDF0D5",
+                panelBorder: "#5C2626",
+                text: "#5C2626",
+                textOutline: "#FFFFFF",
+                option1: "#FDEB8D",
+                option2: "#A8E0D7",
+                option3: "#A3D5E5",
+                option4: "#F5B7B1",
+                stopButton: "#E55B86"
+            };
+
+            const config = {
+                colors: uiColors,
+                initialTimeLimit: 15,
+                minTimeLimit: 3,
+                timeReduction: 2,
+                numberOfOptions: 4,
+                points: { correct: 10, streakBonus: 2, incorrect: -5 },
+                shapes: ["rectangle", "circle", "triangle"],
+                padding: 0.02,
+                panelPadding: 20
+            };
+
+            const gameState = {
+                score: 0,
+                streak: 0,
+                timeLimit: config.initialTimeLimit,
+                maxNumber: 5,
+                currentA: 0, currentB: 0, currentAnswer: 0, answerString: "",
+                gameActive: false,
+                startScreen: null, gameContainer: null, headerContainer: null,
+                vizRegion: null, qaRegion: null, footerContainer: null,
+                scoreLabel: null, questionLabel: null, typedLabel: null,
+                feedbackLabel: null, optionTile: null,
+                character: null, layoutManager: null, stopwatch: null, timerContainer: null,
+                scoreContainer: null,
+                performanceTracker: null,
+                questionGenerator: null,
+                startTime: null,
+                controller: null,
+                currentLevel: 1,
+                currentStage: 1,
+                mode: 'stage', // 'stage', 'level_run', 'overall_run', 'practice'
+                questionCount: 0,
+                correctCount: 0,
+                savedTime: 0,
+                bonusRemaining: 0,
+                isBonus: false,
+                sessionScore: 0,
+                levelRunScore: 0,
+                overallScore: 0,
+                mainAnswered: 0,
+                fixedMultiplier: 0,
+                statsLabel: null,
+                titleLabel: null
+            };
+
+            const emitter = new zim.Emitter({
+                obj: () => new zim.Circle(10, zim.series(config.colors.option1, config.colors.option2, config.colors.option3)),
+                startPaused: true, poolMin: 100, force: { min: 2, max: 5 }, life: 1.5
+            });
+
+            F.on("resize", () => {
+                if (gameState.layoutManager == null) return;
+                gameState.layoutManager.resize();
+                S.update();
+            });
+
+            const helpers = {
+                toBangla: (num) => {
+                    const banglaDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+                    return String(num).replace(/\d/g, d => banglaDigits[d]);
+                },
+                shuffle: (array) => {
+                    for (let i = array.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [array[i], array[j]] = [array[j], array[i]];
+                    }
+                    return array;
+                },
+                rand: (min, max) => Math.floor(Math.random() * (max - min + 1)) + min
+            };
+
+            gameState.controller = new GameplayController();
+
+            function createStartScreen() {
+                const container = new zim.Container(W, H).addTo(S);
+                new zim.Rectangle(W, H, new zim.GradientColor(config.colors.bgGradient))
+                    .center(container);
+                
+                const titleLabel = new zim.Label({ 
+                    text: "গুণের অভিযান", 
+                    size: 70, // Increased size for prominence
+                    color: config.colors.text, 
+                    bold: true, 
+                    outlineColor: config.colors.textOutline, 
+                    outlineWidth: 2 
+                }).center(container).mov(0, -200);
+
+                const overallRunButton = new zim.Button({
+                    label: new zim.Label({ text: "ওভারঅল রান", color: config.colors.text, bold: true, size: 30 }),
+                    backgroundColor: config.colors.option1,
+                    rollBackgroundColor: config.colors.option1.darken(0.2),
+                    borderColor: config.colors.panelBorder,
+                    borderWidth: 4,
+                    corner: 20,
+                    width: 300,
+                    height: 80
+                }).center(container).mov(0, 0);
+
+                overallRunButton.tap(() => {
+                    container.animate({ alpha: 0 }, 0.5, null, () => {
+                        container.removeFrom();
+                        gameState.mode = 'overall_run';
+                        gameState.currentLevel = 1;
+                        gameState.currentStage = 1;
+                        gameState.overallScore = 0;
+                        gameState.levelRunScore = 0;
+                        startStage();
+                        S.update();
+                    });
+                });
+
+                const levelButtons = new zim.Tile({
+                    obj: zim.series(gameState.controller.levels.map((lev, i) => {
+                        const level = i + 1;
+                        const unlocked = level <= gameState.controller.unlockedLevels;
+                        return new zim.Button({
+                            label: new zim.Label({ text: `লেভেল ${helpers.toBangla(level)}${unlocked ? '' : ' (লকড)'}`, color: config.colors.text, bold: true, size: 30 }),
+                            backgroundColor: unlocked ? config.colors.option2 : zim.grey,
+                            rollBackgroundColor: unlocked ? config.colors.option2.darken(0.2) : zim.grey,
+                            borderColor: config.colors.panelBorder,
+                            borderWidth: 4,
+                            corner: 20,
+                            width: 300,
+                            height: 80
+                        }).tap(() => {
+                            if (unlocked) {
+                                showLevelScreen(level, container);
+                            }
+                        });
+                    })),
+                    clone: false, 
+                    cols: 2,
+                    rows: 2,
+                    spacingH: 20,
+                    spacingV: 20
+                }).center(container).mov(0, 100);
+
+                const statsButton = new zim.Button({
+                    label: new zim.Label({ text: "পারফরম্যান্স দেখুন", color: config.colors.text, bold: true, size: 30 }),
+                    backgroundColor: config.colors.option3,
+                    rollBackgroundColor: config.colors.option3.darken(0.2),
+                    borderColor: config.colors.panelBorder,
+                    borderWidth: 4,
+                    corner: 20,
+                    width: 300,
+                    height: 80
+                }).center(container).mov(0, 350);
+
+                statsButton.tap(() => {
+                    showStatsScreen();
+                });
+
+                const leaderboardButton = new zim.Button({
+                    label: new zim.Label({ text: "লিডারবোর্ড", color: config.colors.text, bold: true, size: 30 }),
+                    backgroundColor: config.colors.option4,
+                    rollBackgroundColor: config.colors.option4.darken(0.2),
+                    borderColor: config.colors.panelBorder,
+                    borderWidth: 4,
+                    corner: 20,
+                    width: 300,
+                    height: 80
+                }).center(container).mov(0, 450);
+
+                leaderboardButton.tap(() => {
+                    showLeaderboardScreen();
+                });
+
+                return container;
+            }
+
+            function showLevelScreen(level, previousContainer) {
+                previousContainer.removeFrom();
+                const container = new zim.Container(W, H).addTo(S);
+                new zim.Rectangle(W, H, new zim.GradientColor(config.colors.bgGradient))
+                    .center(container);
+
+                const titleLabel = new zim.Label({ 
+                    text: `লেভেল ${helpers.toBangla(level)}`, 
+                    size: 70, 
+                    color: config.colors.text, 
+                    bold: true, 
+                    outlineColor: config.colors.textOutline, 
+                    outlineWidth: 2 
+                }).center(container).mov(0, -200);
+
+                const levelRunButton = new zim.Button({
+                    label: new zim.Label({ text: "লেভেল রান", color: config.colors.text, bold: true, size: 30 }),
+                    backgroundColor: config.colors.option1,
+                    rollBackgroundColor: config.colors.option1.darken(0.2),
+                    borderColor: config.colors.panelBorder,
+                    borderWidth: 4,
+                    corner: 20,
+                    width: 300,
+                    height: 80
+                }).center(container).mov(0, 0);
+
+                levelRunButton.tap(() => {
+                    container.animate({ alpha: 0 }, 0.5, null, () => {
+                        container.removeFrom();
+                        gameState.mode = 'level_run';
+                        gameState.currentLevel = level;
+                        gameState.currentStage = 1;
+                        gameState.levelRunScore = 0;
+                        startStage();
+                        S.update();
+                    });
+                });
+
+                const stagesButton = new zim.Button({
+                    label: new zim.Label({ text: "ইন্ডিভিজুয়াল স্টেজ", color: config.colors.text, bold: true, size: 30 }),
+                    backgroundColor: config.colors.option2,
+                    rollBackgroundColor: config.colors.option2.darken(0.2),
+                    borderColor: config.colors.panelBorder,
+                    borderWidth: 4,
+                    corner: 20,
+                    width: 300,
+                    height: 80
+                }).center(container).mov(0, 80);
+
+                stagesButton.tap(() => {
+                    showStageScreen(level, container);
+                });
+
+                const practiceButton = new zim.Button({
+                    label: new zim.Label({ text: "ইন্ডিভিজুয়াল প্র্যাকটিস", color: config.colors.text, bold: true, size: 30 }),
+                    backgroundColor: config.colors.option3,
+                    rollBackgroundColor: config.colors.option3.darken(0.2),
+                    borderColor: config.colors.panelBorder,
+                    borderWidth: 4,
+                    corner: 20,
+                    width: 300,
+                    height: 80
+                }).center(container).mov(0, 160);
+
+                practiceButton.tap(() => {
+                    showPracticeScreen(level, container);
+                });
+
+                const backButton = new zim.Button({
+                    label: new zim.Label({ text: "পিছনে", color: config.colors.text, bold: true, size: 30 }),
+                    backgroundColor: config.colors.stopButton,
+                    rollBackgroundColor: config.colors.stopButton.darken(0.2),
+                    borderColor: config.colors.panelBorder,
+                    borderWidth: 4,
+                    corner: 20,
+                    width: 300,
+                    height: 80
+                }).center(container).mov(0, 240);
+
+                backButton.tap(() => {
+                    container.removeFrom();
+                    gameState.startScreen = createStartScreen();
+                });
+
+                S.update();
+            }
+
+            function showPracticeScreen(level, previousContainer) {
+                previousContainer.removeFrom();
+                const container = new zim.Container(W, H).addTo(S);
+                new zim.Rectangle(W, H, new zim.GradientColor(config.colors.bgGradient))
+                    .center(container);
+
+                const titleLabel = new zim.Label({ 
+                    text: `লেভেল ${helpers.toBangla(level)} প্র্যাকটিস`, 
+                    size: 70, 
+                    color: config.colors.text, 
+                    bold: true, 
+                    outlineColor: config.colors.textOutline, 
+                    outlineWidth: 2 
+                }).center(container).mov(0, -200);
+
+                const maxNum = gameState.controller.getLevelMaxNumber(level);
+                const practiceButtons = [];
+                for (let i = 1; i <= maxNum; i++) {
+                    const multiplier = i;
+                    practiceButtons.push(new zim.Button({
+                        label: new zim.Label({ text: `গুণ ${helpers.toBangla(multiplier)}`, color: config.colors.text, bold: true, size: 30 }),
+                        backgroundColor: config.colors.option1,
+                        rollBackgroundColor: config.colors.option1.darken(0.2),
+                        borderColor: config.colors.panelBorder,
+                        borderWidth: 4,
+                        corner: 20,
+                        width: 150,
+                        height: 80
+                    }).tap(() => {
+                        container.animate({ alpha: 0 }, 0.5, null, () => {
+                            container.removeFrom();
+                            gameState.mode = 'practice';
+                            gameState.currentLevel = level;
+                            gameState.fixedMultiplier = multiplier;
+                            startStage();
+                            S.update();
+                        });
+                    }));
+                }
+
+                const practiceTile = new zim.Tile({
+                    obj: zim.series(practiceButtons),
+                    clone: false, 
+                    cols: Math.min(maxNum, 5),
+                    rows: Math.ceil(maxNum / 5),
+                    spacingH: 20,
+                    spacingV: 20
+                }).center(container).mov(0, 0);
+
+                const backButton = new zim.Button({
+                    label: new zim.Label({ text: "পিছনে", color: config.colors.text, bold: true, size: 30 }),
+                    backgroundColor: config.colors.stopButton,
+                    rollBackgroundColor: config.colors.stopButton.darken(0.2),
+                    borderColor: config.colors.panelBorder,
+                    borderWidth: 4,
+                    corner: 20,
+                    width: 300,
+                    height: 80
+                }).center(container).mov(0, 250);
+
+                backButton.tap(() => {
+                    container.removeFrom();
+                    showLevelScreen(level, container);
+                });
+
+                S.update();
+            }
+
+            function showStageScreen(level, previousContainer) {
+                previousContainer.removeFrom();
+                const container = new zim.Container(W, H).addTo(S);
+                new zim.Rectangle(W, H, new zim.GradientColor(config.colors.bgGradient))
+                    .center(container);
+
+                const titleLabel = new zim.Label({ 
+                    text: `লেভেল ${helpers.toBangla(level)} স্টেজ`, 
+                    size: 70, 
+                    color: config.colors.text, 
+                    bold: true, 
+                    outlineColor: config.colors.textOutline, 
+                    outlineWidth: 2 
+                }).center(container).mov(0, -200);
+
+                const stageButtons = [];
+                for (let i = 1; i <= 6; i++) {
+                    const stage = i;
+                    const unlocked = gameState.controller.isUnlocked(level, stage);
+                    stageButtons.push(new zim.Button({
+                        label: new zim.Label({ text: `স্টেজ ${helpers.toBangla(stage)}`, color: config.colors.text, bold: true, size: 30 }),
+                        backgroundColor: unlocked ? config.colors.option3 : zim.grey,
+                        rollBackgroundColor: unlocked ? config.colors.option3.darken(0.2) : zim.grey,
+                        borderColor: config.colors.panelBorder,
+                        borderWidth: 4,
+                        corner: 20,
+                        width: 150,
+                        height: 80
+                    }).tap(() => {
+                        if (unlocked) {
+                            container.animate({ alpha: 0 }, 0.5, null, () => {
+                                container.removeFrom();
+                                gameState.mode = 'stage';
+                                gameState.currentLevel = level;
+                                gameState.currentStage = stage;
+                                startStage();
+                                S.update();
+                            });
+                        }
+                    }));
+                }
+
+                const stageTile = new zim.Tile({
+                    obj: zim.series(stageButtons),
+                    clone: false, 
+                    cols: 3,
+                    rows: 2,
+                    spacingH: 20,
+                    spacingV: 20
+                }).center(container).mov(0, 0);
+
+                const backButton = new zim.Button({
+                    label: new zim.Label({ text: "পিছনে", color: config.colors.text, bold: true, size: 30 }),
+                    backgroundColor: config.colors.stopButton,
+                    rollBackgroundColor: config.colors.stopButton.darken(0.2),
+                    borderColor: config.colors.panelBorder,
+                    borderWidth: 4,
+                    corner: 20,
+                    width: 300,
+                    height: 80
+                }).center(container).mov(0, 250);
+
+                backButton.tap(() => {
+                    container.removeFrom();
+                    showLevelScreen(level, container);
+                });
+
+                S.update();
+            }
+
+            function createBackgroundDecorations() {
+                const decorContainer = new zim.Container(W, H).addTo(S, 0);
+                loop(50, () => {
+                    const type = helpers.rand(1, 3);
+                    let item;
+                    if (type === 1) {
+                        item = new zim.Label({
+                            text: helpers.rand(1, 9).toString(),
+                            size: helpers.rand(20, 80),
+                            color: "rgba(255,255,255,0.1)",
+                            italic: true
+                        });
+                    } else if (type === 2) {
+                        item = new zim.Poly({
+                            radius: helpers.rand(10, 40),
+                            color: "rgba(255,255,255,0.1)",
+                            sides: 5,
+                        });
+                    } else {
+                        item = new zim.Squiggle({
+                            length: helpers.rand(50, 150),
+                            color: "rgba(255,255,255,0.1)",
+                            thickness: helpers.rand(20, 40)
+                        });
+                    }
+                    item.pos(helpers.rand(0, W), helpers.rand(0, H)).rot(helpers.rand(0, 360)).addTo(decorContainer);
+                });
+                return decorContainer;
+            }
+
+            function createGameScreen() {
+                const gameContainer = new zim.Container(W, H).center(S);
+                gameContainer.setBounds(0, 0, W, H);
+                gameContainer.visible = false;
+
+                new zim.Rectangle(W, H, new zim.GradientColor(config.colors.bgGradient))
+                    .center(gameContainer).mouseEnabled = false;
+
+                const padding = W * config.padding;
+                const layoutHolder = new zim.Container(W - 2 * padding, H - 2 * padding).center(gameContainer);
+
+                gameState.headerContainer = new zim.Container(W, 100).addTo(layoutHolder);
+                gameState.headerContainer.type = "Region";
+                const helpContainer = new zim.Container(400, 100).addTo(gameState.headerContainer); // Increased width for stats panel
+                helpContainer.type = "Region";
+                const scoreTimerContainer = new zim.Container(400, 100).addTo(gameState.headerContainer);
+                scoreTimerContainer.type = "Region";
+
+                gameState.scoreContainer = new zim.Container(400, 50).addTo(scoreTimerContainer);
+                gameState.scoreContainer.type = "Region";
+
+                gameState.timerContainer = new zim.Container(400, 50).addTo(scoreTimerContainer);
+                gameState.timerContainer.type = "Region";
+
+                const scoreTimerLayout = new zim.Layout({
+                    holder: scoreTimerContainer, regions:[
+                        { object: gameState.scoreContainer, maxHeight: 50, align: "center", valign: "top" },
+                        { object: gameState.timerContainer, maxHeight: 50, align: "center", valign: "bottom" }
+                    ], vertical: true
+                });
+
+                const headerLayout = new zim.Layout({
+                    holder: gameState.headerContainer, regions: [
+                        { object: helpContainer, align: "left", valign: "center", maxWidth: 50 },
+                        { object: scoreTimerContainer, align: "right", valign: "center", maxWidth: 50 }
+                    ], vertical: false
+                });
+
+                gameState.titleLabel = new zim.Label({ 
+                    text: `লেভেল ${helpers.toBangla(gameState.currentLevel)} - স্টেজ ${helpers.toBangla(gameState.currentStage)}`, 
+                    size: 70, 
+                    color: config.colors.text, 
+                    bold: true, 
+                    outlineColor: config.colors.textOutline, 
+                    outlineWidth: 2 
+                }).center(helpContainer).mov(0, -25);
+
+                // Stats panel container
+                gameState.statsContainer = new zim.Container(350, 50).center(helpContainer).mov(0, 25);
+                new zim.Rectangle({
+                    width: 350,
+                    height: 50,
+                    color: config.colors.panel,
+                    borderColor: config.colors.panelBorder,
+                    borderWidth: 4,
+                    corner: 12
+                }).center(gameState.statsContainer).sha("rgba(0,0,0,0.2)", 4);
+
+                // Individual stats labels
+                gameState.statsLabels = {
+                    question: new zim.Label({ 
+                        text: "প্রশ্ন: ০", 
+                        size: 20, 
+                        color: config.colors.text, 
+                        backgroundColor: config.colors.option1,
+                        padding: 5,
+                        corner: 8 
+                    }).pos(10, 0, "left", "center", gameState.statsContainer),
+                    correct: new zim.Label({ 
+                        text: "সঠিক: ০", 
+                        size: 20, 
+                        color: config.colors.text, 
+                        backgroundColor: config.colors.option2,
+                        padding: 5,
+                        corner: 8 
+                    }).pos(90, 0, "left", "center", gameState.statsContainer),
+                    incorrect: new zim.Label({ 
+                        text: "ভুল: ০", 
+                        size: 20, 
+                        color: config.colors.text, 
+                        backgroundColor: config.colors.option3,
+                        padding: 5,
+                        corner: 8 
+                    }).pos(170, 0, "left", "center", gameState.statsContainer),
+                    bonus: new zim.Label({ 
+                        text: "বোনাস: ০", 
+                        size: 20, 
+                        color: config.colors.text, 
+                        backgroundColor: config.colors.option4,
+                        padding: 5,
+                        corner: 8 
+                    }).pos(250, 0, "left", "center", gameState.statsContainer)
+                };
+
+                const helpLayout = new zim.Layout({
+                    holder: helpContainer,
+                    regions: [
+                        { object: gameState.titleLabel, maxHeight: 50, align: "center", valign: "top" },
+                        { object: gameState.statsContainer, maxHeight: 50, align: "center", valign: "bottom" }
+                    ],
+                    vertical: true
+                });
+
+                gameState.contentContainer = new zim.Container(W, H - 250).addTo(layoutHolder);
+                gameState.contentContainer.type = "Region";
+                gameState.vizRegion = new zim.Container(W * 0.5, gameState.contentContainer.height).addTo(gameState.contentContainer);
+                gameState.vizRegion.type = "Region";
+                gameState.qaRegion = new zim.Container(W * 0.5, gameState.contentContainer.height).addTo(gameState.contentContainer);
+                gameState.qaRegion.type = "Region";
+
+                const contentLayout = new zim.Layout({
+                    holder: gameState.contentContainer, regions: [
+                        { object: gameState.vizRegion, maxWidth: 50, marginLeft: 2 },
+                        { object: gameState.qaRegion, maxWidth: 50, marginLeft: 2 }
+                    ], vertical: false
+                });
+
+                gameState.footerContainer = new zim.Container(W, 100).addTo(layoutHolder);
+                gameState.footerContainer.type = "Region";
+                const owlContainer = new zim.Container(300, 100).addTo(gameState.footerContainer);
+                owlContainer.type = "Region";
+                const stopContainer = new zim.Container(200, 100).addTo(gameState.footerContainer);
+                stopContainer.type = "Region";
+                const statsContainer = new zim.Container(W - 500, 100).addTo(gameState.footerContainer);
+                statsContainer.type = "Region";
+
+                const footerLayout = new zim.Layout({
+                    holder: gameState.footerContainer, regions: [
+                        { object: owlContainer, align: "left", valign: "center", maxWidth: 30 },
+                        { object: statsContainer, align: "center", valign: "center", maxWidth: 40 },
+                        { object: stopContainer, align: "right", valign: "center", maxWidth: 30 }
+                    ], vertical: false
+                });
+
+                gameState.layout = new zim.Layout({
+                    holder: layoutHolder, regions: [
+                        { object: gameState.headerContainer, maxHeight: 15 },
+                        { object: gameState.contentContainer, minHeight: 70 },
+                        { object: gameState.footerContainer, maxHeight: 15 }
+                    ], vertical: true
+                });
+
+                gameState.layoutManager = new zim.LayoutManager();
+                gameState.layoutManager.add(gameState.layout);
+                gameState.layoutManager.add(headerLayout);
+                gameState.layoutManager.add(scoreTimerLayout);
+                gameState.layoutManager.add(helpLayout);
+                gameState.layoutManager.add(contentLayout);
+                gameState.layoutManager.add(footerLayout);
+
+                // Ensure identical panels for vizRegion and qaRegion
+                new zim.Rectangle({
+                    width: W * 0.5 - 20, 
+                    height: gameState.contentContainer.height - 20, 
+                    color: config.colors.panel, 
+                    borderColor: config.colors.panelBorder, 
+                    borderWidth: 8, 
+                    corner: 30
+                }).center(gameState.vizRegion);
+
+                new zim.Rectangle({
+                    width: W * 0.5 - 20, 
+                    height: gameState.contentContainer.height - 20, 
+                    color: config.colors.panel, 
+                    borderColor: config.colors.panelBorder, 
+                    borderWidth: 8, 
+                    corner: 30
+                }).center(gameState.qaRegion);
+
+                gameState.scoreLabel = new zim.Label({ 
+                    text: `স্কোর: ০`, 
+                    size: 40, 
+                    color: config.colors.text, 
+                    bold: true, 
+                    outlineColor: config.colors.textOutline, 
+                    outlineWidth: 2 
+                }).center(gameState.scoreContainer);
+
+                gameState.stopwatch = createStopwatch(gameState.timeLimit, gameState.timerContainer.height, gameState.timerContainer.width, gameState.layoutManager, S).center(gameState.timerContainer);
+                gameState.stopwatch.on("done", () => {
+                    if (gameState.gameActive) {
+                        const timeTaken = gameState.timeLimit;
+                        gameState.performanceTracker.logResponse(gameState.currentA, gameState.currentB, null, timeTaken, false);
+                        gameState.gameActive = false;
+                        gameState.streak = 0;
+                        gameState.score = Math.max(0, gameState.score + config.points.incorrect);
+                        gameState.scoreLabel.text = `স্কোর: ${helpers.toBangla(gameState.score)}`;
+                        const feedback = new zim.Label({
+                            size: 60,
+                            color: "red",
+                            align: "center",
+                            backgroundColor: "rgba(0,0,0,0.7)",
+                            padding: 20,
+                            corner: 15,
+                            text: `সময় শেষ! সঠিক উত্তর: ${helpers.toBangla(gameState.currentAnswer)}`
+                        }).center(S);
+                        transitionToNextQuestion(feedback);
+                    }
+                });
+
+                const stopButton = new zim.Button({
+                    label: new zim.Label({ text: "X", size: 50, color: "white" }),
+                    backgroundColor: config.colors.stopButton,
+                    width: 80, height: 80, corner: 40,
+                    shadowColor: "rgba(0,0,0,0.3)", shadowBlur: 5
+                }).center(gameState.footerContainer.getChildAt(1));
+                stopButton.on("click", () => {
+                    gameState.gameActive = false;
+                    gameState.stopwatch.stop();
+                    S.off("keydown");
+                    gameState.gameContainer.visible = false;
+                    gameState.performanceTracker.saveToLocal();
+                    gameState.startScreen = createStartScreen();
+                    gameState.score = 0;
+                    gameState.streak = 0;
+                    gameState.timeLimit = config.initialTimeLimit;
+                    S.update();
+                });
+
+                const helpButton = new zim.Button({
+                    label: new zim.Label({ text: "?", size: 15, color: config.colors.text }),
+                    backgroundColor: config.colors.panelBorder,
+                    width: 40, height: 40, corner: 12
+                }).pos(50, 50, "right", "bottom", gameState.footerContainer).tap(() => {
+                    const pane = new zim.Pane({
+                        width: 600,
+                        height: 400,
+                        label: new zim.Label({
+                            text: "গুণের অভিযানে স্বাগতম!\n\n" +
+                                  "কীভাবে খেলবেন:\n" +
+                                  "১. একটি লেভেল এবং স্টেজ বা প্র্যাকটিস মোড বাছাই করুন।\n" +
+                                  "২. গুণের প্রশ্নের উত্তর বাছাই করুন বা কীবোর্ডে টাইপ করে এন্টার চাপুন।\n" +
+                                  "৩. সঠিক উত্তরের জন্য ১০ পয়েন্ট এবং পরপর সঠিক উত্তরে বোনাস পয়েন্ট পান।\n" +
+                                  "৪. ভুল উত্তরে ৫ পয়েন্ট হারান।\n" +
+                                  "৫. স্টেজ মোডে ২০টি প্রশ্নের মধ্যে ৮০% সঠিক উত্তর দিয়ে পরবর্তী স্টেজ আনলক করুন।\n" +
+                                  "৬. লেভেল রান বা ওভারঅল রানে সব স্টেজ খেলে উচ্চ স্কোর অর্জন করুন।\n" +
+                                  "৭. প্র্যাকটিস মোডে নির্দিষ্ট গুণের টেবিল অনুশীলন করুন।\n\n" +
+                                  "শুভকামনা!",
+                            size: 30,
+                            color: config.colors.text,
+                            align: "center"
+                        }),
+                        backgroundColor: config.colors.panel,
+                        backdropColor: zim.black.toAlpha(0.8),
+                        close: true,
+                        closeColor: config.colors.text
+                    }).show();
+                    pane.backdrop.alp(0.3);
+                    pane.on("close", () => {
+                        pane.backdrop.alp(1);
+                    }, null, true);
+                });
+
+                gameState.questionLabel = new zim.Label({ 
+                    text: "...", 
+                    size: 60, 
+                    color: config.colors.text, 
+                    align: "center", 
+                    bold: true 
+                }).center(gameState.qaRegion).mov(0, -150);
+
+                gameState.typedLabel = new zim.Label({ 
+                    text: "", 
+                    size: 50, 
+                    color: "green" 
+                }).center(gameState.qaRegion);
+
+                gameState.feedbackLabel = new zim.Label({ 
+                    text: "সঠিক উত্তরটি বাছাই করুন অথবা টাইপ করে এন্টার চাপুন", 
+                    size: 30, 
+                    color: config.colors.text 
+                }).center(gameState.footerContainer);
+
+                return gameContainer;
+            }
+
+            function startStage() {
+                gameState.gameContainer.visible = true;
+                gameState.layoutManager.resize();
+                gameState.performanceTracker = new PerformanceTracker();
+                gameState.performanceTracker.loadFromLocal();
+                gameState.maxNumber = gameState.controller.getLevelMaxNumber(gameState.currentLevel);
+                gameState.timeLimit = gameState.controller.getTimeLimit(gameState.currentStage);
+                gameState.questionGenerator = new QuestionGenerator(gameState.maxNumber, gameState.performanceTracker);
+                gameState.score = 0;
+                gameState.scoreLabel.text = `স্কোর: ০`;
+                gameState.streak = 0;
+                gameState.questionCount = 0;
+                gameState.correctCount = 0;
+                gameState.savedTime = 0;
+                gameState.bonusRemaining = 0;
+                gameState.isBonus = false;
+                gameState.mainAnswered = 0;
+                gameState.gameActive = true;
+                if (gameState.mode !== 'practice') {
+                    gameState.titleLabel.text = `লেভেল ${helpers.toBangla(gameState.currentLevel)} - স্টেজ ${helpers.toBangla(gameState.currentStage)}`;
+                } else {
+                    gameState.titleLabel.text = `প্র্যাকটিস: গুণ ${helpers.toBangla(gameState.fixedMultiplier)}`;
+                }
+                updateStatsLabel();
+                S.on("keydown", handleKeyDown);
+                F.canvas.focus();
+                generateQuestion();
+                S.update();
+            }
+
+            function generateQuestion() {
+                if (!gameState.gameActive) return;
+                if (gameState.optionTile) gameState.optionTile.removeFrom();
+
+                let a, b;
+                if (gameState.mode === 'practice') {
+                    a = helpers.rand(1, gameState.maxNumber);
+                    b = gameState.fixedMultiplier;
+                } else {
+                    ({ a, b } = gameState.questionGenerator.generateAdaptiveQuestion(gameState.currentStage));
+                }
+                gameState.currentA = a;
+                gameState.currentB = b;
+                gameState.currentAnswer = a * b;
+                gameState.questionLabel.text = `${helpers.toBangla(a)} × ${helpers.toBangla(b)} = ?`;
+                updateVisualization(a, b);
+
+                const options = gameState.questionGenerator.generateOptions(gameState.currentAnswer, a, b);
+                let tileCols = 1;
+                let tileRows = config.numberOfOptions;
+                let spacingH = 0;
+                let spacingV = 20;
+                let buttonWidth = 250;
+                let buttonHeight = 80;
+                let movY = 50;
+
+                if (config.numberOfOptions === 4) {
+                    tileCols = 2;
+                    tileRows = 2;
+                    spacingH = 20;
+                    buttonWidth = 180;
+                    buttonHeight = 100;
+                    movY = 100;
+                }
+
+                const optionColorList = [config.colors.option1, config.colors.option2, config.colors.option3, config.colors.option4];
+                const optionColors = zim.series(optionColorList);
+                
+                const buttons = options.map(opt => {
+                    const bgColor = optionColors();
+                    const button = new zim.Button({
+                        width: buttonWidth,
+                        height: buttonHeight,
+                        backgroundColor: bgColor,
+                        rollBackgroundColor: bgColor.darken(0.2),
+                        label: new zim.Label({ text: helpers.toBangla(opt), size: 40, color: config.colors.text, bold: true }),
+                        corner: 40,
+                        borderColor: config.colors.panelBorder,
+                        borderWidth: 4,
+                        shadowColor: "rgba(0,0,0,0.2)",
+                        shadowBlur: 4
+                    });
+                    button.answerValue = opt;
+                    return button;
+                });
+
+                gameState.optionTile = new zim.Tile({
+                    obj: zim.series(buttons),
+                    clone: false, 
+                    cols: tileCols,
+                    rows: tileRows,
+                    spacingH: spacingH,
+                    spacingV: spacingV
+                }).center(gameState.qaRegion).mov(0, movY);
+
+                gameState.optionTile.on("click", (e) => {
+                    if (!gameState.gameActive || !e.target || e.target.answerValue === undefined) return;
+                    const timeTaken = gameState.stopwatch.getElapsedTime();
+                    gameState.stopwatch.stop();
+                    checkAnswer(e.target.answerValue, timeTaken);
+                });
+
+                gameState.answerString = "";
+                gameState.typedLabel.text = "";
+                gameState.feedbackLabel.text = "সঠিক উত্তরটি বাছাই করুন অথবা টাইপ করে এন্টার চাপুন";
+                gameState.stopwatch.setTime(gameState.timeLimit);
+                gameState.stopwatch.start();
+                gameState.startTime = Date.now();
+                S.update();
+            }
+
+            function handleKeyDown(e) {
+                if (!gameState.gameActive || !gameState.optionTile) return;
+                if (e.keyCode >= 48 && e.keyCode <= 57) {
+                    gameState.answerString += String.fromCharCode(e.keyCode);
+                } else if (e.keyCode === 8) {
+                    gameState.answerString = gameState.answerString.slice(0, -1);
+                } else if (e.keyCode === 13) {
+                    const ans = parseInt(gameState.answerString);
+                    if (!isNaN(ans)) {
+                        const timeTaken = (Date.now() - gameState.startTime) / 1000;
+                        gameState.stopwatch.stop();
+                        checkAnswer(ans, timeTaken);
+                    }
+                }
+                gameState.typedLabel.text = helpers.toBangla(gameState.answerString);
+                S.update();
+            }
+
+            function checkAnswer(ans, timeTaken) {
+                if (!gameState.gameActive) return;
+                gameState.gameActive = false;
+                const correct = ans === gameState.currentAnswer;
+                gameState.performanceTracker.logResponse(gameState.currentA, gameState.currentB, ans, timeTaken, correct);
+                const points = config.points.correct + gameState.streak * config.points.streakBonus;
+                const feedback = new zim.Label({
+                    size: 60,
+                    color: correct ? "green" : "red",
+                    align: "center",
+                    backgroundColor: "rgba(0,0,0,0.7)",
+                    padding: 20,
+                    corner: 15
+                }).center(S);
+                if (correct) {
+                    gameState.streak++;
+                    gameState.score += points;
+                    feedback.text = `দারুণ! +${helpers.toBangla(points)} পয়েন্ট`;
+                    emitter.loc(gameState.questionLabel).spurt(30);
+                    if (!gameState.isBonus && gameState.mode !== 'practice') {
+                        gameState.correctCount++;
+                        gameState.savedTime += Math.floor(gameState.timeLimit - timeTaken);
+                    }
+                } else {
+                    gameState.streak = 0;
+                    gameState.score = Math.max(0, gameState.score + config.points.incorrect);
+                    feedback.text = `সঠিক উত্তর: ${helpers.toBangla(gameState.currentAnswer)} | ${helpers.toBangla(config.points.incorrect)} পয়েন্ট`;
+                }
+                gameState.scoreLabel.text = `স্কোর: ${helpers.toBangla(gameState.score)}`;
+                transitionToNextQuestion(feedback);
+            }
+
+            function transitionToNextQuestion(feedback) {
+                const foil = new zim.Rectangle(W, H, zim.clear).addTo(S);
+                zim.timeout(1.5, () => {
+                    feedback.animate({ alpha: 0 }, 0.5, null, () => {
+                        feedback.removeFrom();
+                        foil.removeFrom();
+                        gameState.gameActive = true;
+                        if (gameState.mode === 'practice') {
+                            generateQuestion();
+                        } else {
+                            if (gameState.isBonus) {
+                                gameState.bonusRemaining--;
+                            } else {
+                                gameState.questionCount++;
+                                gameState.mainAnswered = gameState.questionCount;
+                            }
+                            if (gameState.questionCount < gameState.controller.questionsPerSession) {
+                                generateQuestion();
+                            } else if (!gameState.isBonus && gameState.bonusRemaining === 0) {
+                                const percent = (gameState.correctCount / gameState.controller.questionsPerSession) * 100;
+                                const success = percent >= gameState.controller.requiredCorrectPercent;
+                                if (success && gameState.savedTime > 0) {
+                                    gameState.bonusRemaining = Math.floor(gameState.savedTime / gameState.timeLimit);
+                                    gameState.isBonus = true;
+                                    generateQuestion();
+                                } else {
+                                    endStage(success);
+                                }
+                            } else if (gameState.bonusRemaining > 0) {
+                                generateQuestion();
+                            } else {
+                                endStage(true);
+                            }
+                        }
+                        updateStatsLabel();
+                    });
+                });
+            }
+
+            function updateStatsLabel() {
+                const incorrect = gameState.mainAnswered - gameState.correctCount;
+                gameState.statsLabels.question.text = `প্রশ্ন: ${helpers.toBangla(gameState.mainAnswered)}/${helpers.toBangla(gameState.controller.questionsPerSession)}`;
+                gameState.statsLabels.correct.text = `সঠিক: ${helpers.toBangla(gameState.correctCount)}`;
+                gameState.statsLabels.incorrect.text = `ভুল: ${helpers.toBangla(incorrect)}`;
+                gameState.statsLabels.bonus.text = `বোনাস: ${helpers.toBangla(gameState.bonusRemaining)}`;
+                S.update();
+            }
+
+            function endStage(success) {
+                gameState.gameActive = false;
+                gameState.stopwatch.stop();
+                S.off("keydown");
+                const sessionScore = gameState.score;
+                gameState.performanceTracker.saveStageHigh(gameState.currentLevel, gameState.currentStage, sessionScore);
+                if (success) {
+                    gameState.controller.unlockNextStage(gameState.currentLevel, gameState.currentStage);
+                    if (gameState.mode === 'level_run' || gameState.mode === 'overall_run') {
+                        gameState.levelRunScore += sessionScore;
+                        if (gameState.currentStage < gameState.controller.stagesPerLevel) {
+                            gameState.currentStage++;
+                            startStage();
+                            return;
+                        } else {
+                            gameState.performanceTracker.saveLevelHigh(gameState.currentLevel, gameState.levelRunScore);
+                            if (gameState.mode === 'overall_run' && gameState.currentLevel < gameState.controller.levels.length) {
+                                gameState.overallScore += gameState.levelRunScore;
+                                gameState.currentLevel++;
+                                gameState.currentStage = 1;
+                                gameState.levelRunScore = 0;
+                                startStage();
+                                return;
+                            } else if (gameState.mode === 'overall_run') {
+                                gameState.performanceTracker.saveOverallHigh(gameState.overallScore);
+                            }
+                        }
+                    }
+                }
+                gameState.gameContainer.visible = false;
+                gameState.performanceTracker.saveToLocal();
+                gameState.startScreen = createStartScreen();
+                S.update();
+            }
+
+            function showStatsScreen() {
+                const stats = gameState.performanceTracker.getStatistics();
+                const pane = new zim.Pane({
+                    width: 800,
+                    height: 600,
+                    label: new zim.Label({
+                        text: `পারফরম্যান্স স্ট্যাটিস্টিক্স:\n\nসমস্যাজনক প্রশ্নসমূহ: ${stats.problematicProblems.join(', ') || 'কোনো সমস্যাজনক প্রশ্ন নেই'}\nগড় প্রতিক্রিয়া সময়: ${stats.averageResponseTime.toFixed(2)} সেকেন্ড\nমোট সঠিক: ${stats.totalCorrect}\nমোট ভুল: ${stats.totalIncorrect}`,
+                        size: 30,
+                        color: config.colors.text,
+                        align: "center"
+                    }),
+                    backgroundColor: config.colors.panel,
+                    backdropColor: zim.black.toAlpha(0.8),
+                    close: true,
+                    closeColor: config.colors.text
+                }).show();
+            }
+
+            function showLeaderboardScreen() {
+                let text = "লিডারবোর্ড:\n\nওভারঅল:\n";
+                const overall = gameState.performanceTracker.getOverallLeaderboard();
+                text += overall.map((entry, index) => `${index + 1}. ${entry.score} (${new Date(entry.date).toLocaleDateString()})`).join('\n') || 'কোনো স্কোর নেই';
+
+                text += "\n\nলেভেল রান:\n";
+                gameState.controller.levels.forEach(lev => {
+                    text += `লেভেল ${lev.id}:\n`;
+                    const levelLb = gameState.performanceTracker.getLevelLeaderboard(lev.id);
+                    text += levelLb.map((entry, index) => `${index + 1}. ${entry.score} (${new Date(entry.date).toLocaleDateString()})`).join('\n') || 'কোনো স্কোর নেই\n';
+                });
+
+                text += "\n\nস্টেজ:\n";
+                gameState.controller.levels.forEach(lev => {
+                    text += `লেভেল ${lev.id}:\n`;
+                    loop(gameState.controller.stagesPerLevel, i => {
+                        const stage = i + 1;
+                        text += `  স্টেজ ${stage}:\n`;
+                        const stageLb = gameState.performanceTracker.getStageLeaderboard(lev.id, stage);
+                        text += stageLb.map((entry, index) => `    ${index + 1}. ${entry.score} (${new Date(entry.date).toLocaleDateString()})`).join('\n') || '    কোনো স্কোর নেই\n';
+                    });
+                });
+
+                const pane = new zim.Pane({
+                    width: 600,
+                    height: 600,
+                    label: new zim.Label({
+                        text: text,
+                        size: 20,
+                        color: config.colors.text,
+                        align: "left"
+                    }),
+                    backgroundColor: config.colors.panel,
+                    backdropColor: zim.black.toAlpha(0.8),
+                    close: true,
+                    closeColor: config.colors.text
+                }).show();
+            }
+
+            function updateVisualization(a, b) {
+                zog("updateVisualization start:", a, "x", b);
+
+                gameState.vizRegion.removeAllChildren();
+
+                const panelPadding = config.panelPadding || 20;
+                const panelMargin = 0;
+                const panelW = gameState.vizRegion.width || (W * 0.5);
+                const panelH = gameState.vizRegion.height || (gameState.contentContainer ? gameState.contentContainer.height : H * 0.5);
+
+                const panel = new zim.Rectangle({
+                    width: panelW - 2 * (panelMargin + panelPadding),
+                    height: panelH - 2 * (panelMargin + panelPadding),
+                    color: config.colors.panel,
+                    borderColor: config.colors.panelBorder,
+                    borderWidth: 8,
+                    corner: 30
+                }).center(gameState.vizRegion);
+                zog("Panel bounds:", panel.getBounds().x, panel.getBounds().y, panel.getBounds().width, panel.getBounds().height);
+
+                const optionColors = [config.colors.option1, config.colors.option2, config.colors.option3, config.colors.option4];
+                const pickColor = () => optionColors[helpers.rand(0, optionColors.length - 1)];
+
+                const shapeFactories = [
+                    (size) => new zim.Circle(size / 2, pickColor(), config.colors.panelBorder, 2),
+                    (size) => new zim.Rectangle(size, size, pickColor(), config.colors.panelBorder, 2, 8),
+                    (size) => new zim.Triangle(size, size, size, pickColor(), config.colors.panelBorder, 2),
+                    (size) => new zim.Poly({ radius: size * 0.75, sides: 7, point: 0, color: pickColor(), borderColor: config.colors.panelBorder, borderWidth: 2 })
+                ];
+                const shapeFactory = shapeFactories[helpers.rand(0, shapeFactories.length - 1)];
+
+                const maxCols = Math.min(b, 3);
+                const cols = maxCols;
+                const rows = Math.ceil(b / cols);
+                const spacingH = 18;
+                const spacingV = 18;
+                const groupMargin = 3;
+
+                const totalSpacingW = (cols - 1) * spacingH + 2 * panelPadding;
+                const totalSpacingH = (rows - 1) * spacingV + 2 * panelPadding;
+                let groupW = Math.floor((panelW - 2 * (panelMargin + panelPadding) - totalSpacingW) / cols);
+                let groupH = Math.floor((panelH - 2 * (panelMargin + panelPadding) - totalSpacingH) / rows);
+
+                const minGroupSize = Math.max(12, Math.min(a, b) * 1.2);
+                groupW = Math.max(minGroupSize, groupW);
+                groupH = Math.max(minGroupSize, groupH);
+
+                let totalW = cols * groupW + (cols - 1) * spacingH;
+                let totalH = rows * groupH + (rows - 1) * spacingV;
+
+                let scaleFactor = 1;
+                if (totalW > panelW - 2 * (panelMargin + panelPadding) || totalH > panelH - 2 * (panelMargin + panelPadding)) {
+                    scaleFactor = Math.min(
+                        (panelW - 2 * (panelMargin + panelPadding)) / totalW,
+                        (panelH - 2 * (panelMargin + panelPadding)) / totalH
+                    );
+                    groupW = Math.floor(groupW * scaleFactor);
+                    groupH = Math.floor(groupH * scaleFactor);
+                    totalW = Math.floor(totalW * scaleFactor);
+                    totalH = Math.floor(totalH * scaleFactor);
+                    spacingH = Math.floor(spacingH * scaleFactor);
+                    spacingV = Math.floor(spacingV * scaleFactor);
+                }
+
+                groupW = Math.max(minGroupSize, groupW);
+                groupH = Math.max(minGroupSize, groupH);
+
+                totalW = cols * groupW + (cols - 1) * spacingH;
+                totalH = rows * groupH + (rows - 1) * spacingV;
+
+                const startX = (panelW - totalW) / 2;
+                const startY = (panelH - totalH) / 2;
+                zog("Grid bounds: x=", startX, "y=", startY, "width=", totalW, "height=", totalH);
+
+                const groups = [];
+
+                for (let i = 0; i < b; i++) {
+                    const col = i % cols;
+                    const row = Math.floor(i / cols);
+                    const gx = startX + col * (groupW + spacingH);
+                    const gy = startY + row * (groupH + spacingV);
+
+                    const group = new zim.Container(groupW, groupH).addTo(gameState.vizRegion);
+                    group.x = gx;
+                    group.y = gy;
+
+                    new zim.Rectangle({
+                        width: groupW,
+                        height: groupH,
+                        color: config.colors.panel.lighten(0.1),
+                        borderColor: config.colors.panelBorder,
+                        borderWidth: 2,
+                        corner: 12
+                    }).center(group).sha("rgba(0,0,0,0.1)", 3, 3, 5);
+
+                    const innerPad = Math.max(groupMargin, Math.min(groupW * 0.1, groupH * 0.1));
+                    const innerW = groupW - 2 * innerPad;
+                    const innerH = groupH - 2 * innerPad;
+                    const innerCols = Math.ceil(Math.sqrt(a));
+                    const innerRows = Math.ceil(a / innerCols);
+                    const gap = Math.min(6, Math.min(innerW / innerCols, innerH / innerRows) * 0.2);
+                    let shapeSizeW = Math.floor((innerW - (innerCols - 1) * gap) / innerCols);
+                    let shapeSizeH = Math.floor((innerH - (innerRows - 1) * gap) / innerRows);
+                    let shapeSize = Math.max(8, Math.min(shapeSizeW, shapeSizeH));
+
+                    if (innerCols * shapeSize + (innerCols - 1) * gap > innerW ||
+                        innerRows * shapeSize + (innerRows - 1) * gap > innerH) {
+                        shapeSize = Math.floor(Math.min(
+                            (innerW - (innerCols - 1) * gap) / innerCols,
+                            (innerH - (innerRows - 1) * gap) / innerRows
+                        ));
+                    }
+
+                    const totalShapeWidth = innerCols * shapeSize + (innerCols - 1) * gap;
+                    const totalShapeHeight = innerRows * shapeSize + (innerRows - 1) * gap;
+                    const offsetX = innerPad + (innerW - totalShapeWidth) / 2;
+                    const offsetY = innerPad + (innerH - totalShapeHeight) / 2;
+                    zog(`Group ${i}: offsetX=${offsetX}, offsetY=${offsetY}, shapeSize=${shapeSize}, innerW=${innerW}, innerH=${innerH}`);
+
+                    for (let j = 0; j < a; j++) {
+                        const sc = j % innerCols;
+                        const sr = Math.floor(j / innerCols);
+                        const sx = offsetX + sc * (shapeSize + gap);
+                        const sy = offsetY + sr * (shapeSize + gap);
+                        const shape = shapeFactory(shapeSize)
+                            .addTo(group)
+                            .pos(sx, sy, "left", "top");
+                    }
+
+                    group.alp(0).sca(0.5).animate({
+                        props: { alpha: 1, scale: 1 },
+                        time: 0.5 + i * 0.1,
+                        ease: "backOut",
+                        events: true
+                    });
+
+                    groups.push(group);
+                }
+
+                groups.forEach((group, i) => {
+                    const bounds = group.getBounds();
+                    zog(`Group ${i} bounds: x=${bounds.x}, y=${bounds.y}, width=${bounds.width}, height=${bounds.height}`);
+                });
+
+                S.update();
+                zog("updateVisualization finished - groups:", groups.length);
+            }
+
+            createBackgroundDecorations();
+            gameState.gameContainer = createGameScreen();
+            gameState.startScreen = createStartScreen();
+            gameState.gameContainer.visible = false;
+            S.update();
+        }
+    </script>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #333333; }
+        canvas { -webkit-tap-highlight-color: transparent; }
+    </style>
+</head>
+<body>
+    <canvas id="myCanvas" tabindex="0"></canvas>
+</body>
+</html>
