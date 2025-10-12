@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Class Two - Interactive Lessons</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f9;
+            color: #333;
+            line-height: 1.6;
+        }
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-align: center;
+            padding: 2rem 1rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        header h1 {
+            margin: 0;
+            font-size: 2.5rem;
+        }
+        main {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+        .folder-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+        .folder-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+        .folder-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 15px rgba(0,0,0,0.2);
+        }
+        .folder-card h2 {
+            color: #667eea;
+            margin-top: 0;
+            font-size: 1.5rem;
+        }
+        .folder-card p {
+            color: #666;
+            margin-bottom: 1rem;
+        }
+        footer {
+            text-align: center;
+            padding: 1rem;
+            background: #333;
+            color: white;
+            margin-top: 3rem;
+        }
+        @media (max-width: 768px) {
+            header h1 { font-size: 2rem; }
+            .folder-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Class Two Resources</h1>
+        <p>Explore interactive lessons and tools</p>
+    </header>
+    <main>
+        <section>
+            <h2 style="text-align: center; color: #667eea;">Available Modules</h2>
+            <div class="folder-grid">
+                <!-- Add more cards as you create subfolders -->
+                <a href="/multiplication/" class="folder-card">
+                    <h2>Multiplication</h2>
+                    <p>Interactive multiplication tables and exercises for class two students.</p>
+                </a>
+                <!-- Example: Add another subfolder like this -->
+                <!-- <a href="/addition/" class="folder-card">
+                    <h2>Addition</h2>
+                    <p>Fun addition drills and games.</p>
+                </a> -->
+            </div>
+        </section>
+    </main>
+    <footer>
+        <p>&copy; 2025 Class Two. Powered by GitHub Pages.</p>
+    </footer>
+</body>
+</html>
