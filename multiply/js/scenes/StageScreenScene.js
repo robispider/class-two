@@ -47,9 +47,14 @@ class StageScreenScene extends Phaser.Scene {
                     fontStyle: 'bold'
                 }
             ).setOrigin(0.5);
-            button.on('pointerdown', () => {
-                gameState.currentStage = stageNum;
-                startStage(this, 'stage', level, gameState.controller.levels.slice(0, level));
+              button.on('pointerdown', () => {
+                this.scene.start('GameScene', {
+                    mode: 'stage',
+                    level: level,
+                    stage: stageNum,
+                    // Make sure to pass the allowed tables for this level
+                    allowedTables: gameState.controller.levels[level - 1]
+                });
             });
             button.on('pointerover', () =>
                 button.setFillStyle(
@@ -83,6 +88,8 @@ class StageScreenScene extends Phaser.Scene {
             this.scene.start('LevelScreenScene', { level });
         });
     }
+    
+  
 }
 
 export default StageScreenScene;

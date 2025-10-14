@@ -58,3 +58,15 @@ export const planes = [
     "missilebattery.png",
     "missile.png"
 ];
+export const background = [
+    "sky_background/parallax_parts/foreground_cloud_1.png",
+    "sky_background/parallax_parts/farground_cloud_2.png",
+    "sky_background/parallax_parts/mid_ground_cloud_1.png",
+    "sky_background/parallax_parts/mid_ground_cloud_2.png",    
+    "sky_background/parallax_parts/sky_color_top.png",
+    "sky_background/parallax_parts/sky_color_1.png",
+    "sky_background/parallax_parts/mountain_with_hills/farground_mountains.png",
+    "sky_background/parallax_parts/mountain_with_hills/foreground_mountains.png",
+    "sky_background/parallax_parts/mountain_with_hills/midground_mountains.png",
+    
+];

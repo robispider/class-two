@@ -22,6 +22,26 @@ class PreloadScene extends Phaser.Scene {
         this.load.image('missilebattery', 'assets/missilebattery.png');
         this.load.image('missile', 'assets/missile.png');
         // Load other assets as needed
+ this.load.image('groundcolor',"assets/groundcolor.png");
+
+        this.load.image('tree1',"assets/tree/tree1.png");
+        this.load.image('tree2',"assets/tree/tree2.png");
+        this.load.image('tree3',"assets/tree/tree3.png");
+        this.load.image('plents1',"assets/tree/plents1.png");
+
+
+
+        this.load.image('farground_cloud_1',"assets/sky_background/parallax_parts/farground_cloud_1.png");
+        this.load.image('farground_cloud_2',"assets/sky_background/parallax_parts/farground_cloud_2.png");
+        this.load.image('mid_ground_cloud_1',"assets/sky_background/parallax_parts/mid_ground_cloud_1.png");
+        this.load.image('mid_ground_cloud_2',"assets/sky_background/parallax_parts/mid_ground_cloud_2.png");
+        
+        this.load.image('sky_color_top',"assets/sky_background/parallax_parts/sky_color_top.png");
+        this.load.image('sky_color_1',"assets/sky_background/parallax_parts/sky_color.png");
+        this.load.image('farground_mountains',"assets/sky_background/parallax_parts/mountain_with_hills/farground_mountains.png");
+        this.load.image('foreground_mountains',"assets/sky_background/parallax_parts/mountain_with_hills/foreground_mountains.png");
+        this.load.image('midground_mountains',"assets/sky_background/parallax_parts/mountain_with_hills/midground_mountains.png");
+
     }
     create() {
         this.scene.start('StartScreenScene');

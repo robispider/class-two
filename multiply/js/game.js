@@ -109,6 +109,8 @@ export function startQuestionSet(scene, mode, stage, allowedTables) {
             });
         }
     };
+      
+         gameState.timingModel = 'per-question';
     let QuestionClass;
     if (stage <= 2 || (mode === "practice" && stage <= 3)) {
         QuestionClass = StandardQuestion;
@@ -116,6 +118,7 @@ export function startQuestionSet(scene, mode, stage, allowedTables) {
         QuestionClass = FactorPairsQuestion;
     } else if (stage === 4) {
         QuestionClass = PuzzleQuestion;
+        gameState.timingModel = 'per-set';
     } else if (stage === 5) {
         QuestionClass = CascadeQuestion;
     } else if (stage === 6) {

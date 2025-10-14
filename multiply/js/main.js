@@ -11,6 +11,8 @@ import StatsScreenScene from './scenes/StatsScreenScene.js';
 import LeaderboardScreenScene from './scenes/LeaderboardScreenScene.js';
 import GameScene from './scenes/GameScene.js';
 
+// import MatterCollisionPlugin from 'phaser-matter-collision-plugin';
+
 const phaserConfig = {
     type: Phaser.AUTO,
     width: 1024,
@@ -35,9 +37,18 @@ const phaserConfig = {
         default: 'matter',
         matter: {
             gravity: { y: 1 },
-            debug: false
+            debug: true
         }
-    }
+    },
+    //   plugins: {
+    //     scene: [
+    //         {
+    //             plugin: MatterCollisionPlugin, // The plugin class
+    //             key: 'matterCollision',      // Where to store in Scene.Systems, e.g. scene.sys.matterCollision
+    //             mapping: 'matterCollision'   // Where to store in the Scene, e.g. scene.matterCollision
+    //         }
+    //     ]
+    // }
 };
 
 const game = new Phaser.Game(phaserConfig);

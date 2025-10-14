@@ -31,9 +31,10 @@ class GameScene extends Phaser.Scene {
         const padding = this.cameras.main.width * config.padding;
         const W = this.cameras.main.width - 2 * padding;
         const H = this.cameras.main.height - 2 * padding;
+  const UI_DEPTH = 200;
 
         // Header container
-        this.headerContainer = this.add.container(padding, padding).setSize(W, 100);
+        this.headerContainer = this.add.container(padding, padding).setSize(W, 100).setDepth(UI_DEPTH);
 
         // Help container (left side)
         this.helpContainer = this.add.container(0, 0).setSize(W * 0.5, 100);
@@ -97,11 +98,17 @@ class GameScene extends Phaser.Scene {
         ).setOrigin(0.5);
         this.scoreContainer.add(this.scoreLabel);
 
-        // Stopwatch (replicating ZIM.js createStopwatch)
-        this.createStopwatch(30, 50, W * 0.5); // Matches ShootingQuestion timeLimit
+        // Stopwatch 
+         if (gameState.timingModel === 'per-set') {
+            // FIX: Pass the correct width and height for the timer UI
+            this.createMasterStopwatch(gameState.timeLimit, 50, W * 0.5); 
+            if (this.masterStopwatch) {
+                this.masterStopwatch.start();
+            }
+        }
 
         // Footer container
-        this.footerContainer = this.add.container(padding, H - 100 + padding).setSize(W, 100);
+        this.footerContainer = this.add.container(padding, H - 100 + padding).setSize(W, 100).setDepth(UI_DEPTH);
 
         // Owl container (left, placeholder for future use)
         this.owlContainer = this.add.container(0, 0).setSize(300, 100);
@@ -227,136 +234,94 @@ class GameScene extends Phaser.Scene {
         );
 
         // Start stopwatch
-        if (this.stopwatch) {
-            this.stopwatch.paused = false;
+        if (gameState.timingModel === 'per-set') {
+            // Create a master stopwatch for the whole set.
+            // The time limit is set by startStage.
+            this.createMasterStopwatch(gameState.timeLimit); 
+            if (this.masterStopwatch) {
+                this.masterStopwatch.start();
+            }
         }
     }
 
-    createStopwatch(totalTime, height, width) {
+    createMasterStopwatch(totalTime, height, width) {
         const colors = {
-            pink: "#E55B86",
-            cream: "#FDF0D5",
-            orangeRed: "#F26D5B",
-            darkBrown: "#5C2626",
-            yellow: "#FDBF5A",
-            panel: "rgba(0,0,0,0.1)"
+            pink: "#E55B86", cream: "#FDF0D5", orangeRed: "#F26D5B",
+            darkBrown: "#5C2626", yellow: "#FDBF5A"
         };
+        
+        // This container holds the entire stopwatch UI. Position it within the header.
+        const stopwatchContainer = this.add.container(width, 0); // Position to the right
+        this.timerContainer.add(stopwatchContainer);
 
-        // Time holder
-        this.timeHolder = this.add.container(0, 0).setSize(width * 0.5, height);
-        this.timerContainer.add(this.timeHolder);
+        // Replicating the ZIM Dial
+        const dialHolder = this.add.container(-width / 2 + height / 2, height / 2);
+        stopwatchContainer.add(dialHolder);
+        
+        const dialBackground = this.add.circle(0, 0, height * 0.4, Phaser.Display.Color.HexStringToColor(colors.pink).color);
+        const dialInner = this.add.circle(0, 0, height * 0.3, Phaser.Display.Color.HexStringToColor(colors.cream).darken(10).color);
+        // This is the rotating indicator line
+        const dialIndicator = this.add.rectangle(0, -height * 0.15, 2, height * 0.3, Phaser.Display.Color.HexStringToColor(colors.darkBrown).color).setOrigin(0.5, 1);
+        dialHolder.add([dialBackground, dialInner, dialIndicator]);
 
-        // Pink rectangle background
-        this.add.rectangle(-17, 0, width, height, Phaser.Display.Color.HexStringToColor(colors.pink).color)
-            .setOrigin(0, 0.5);
+        // Replicating the Time Text Holder
+        const timeHolder = this.add.container(height / 2 + 10, height / 2);
+        stopwatchContainer.add(timeHolder);
+        
+        const timeBg = this.add.rectangle(0, 0, width - height - 20, height, Phaser.Display.Color.HexStringToColor(colors.pink).color).setOrigin(0, 0.5);
+        const timeLabel = this.add.text(10, 0, ``, {
+            fontSize: `${height * 0.6}px`, fill: colors.darkBrown,
+            fontFamily: 'arial', fontStyle: 'bold',
+            stroke: colors.cream, strokeThickness: 1
+        }).setOrigin(0, 0.5);
+        timeHolder.add([timeBg, timeLabel]);
 
-        // Time label
-        this.timeLabel = this.add.text(
-            10,
-            0,
-            `সময়: ${toBangla(0)}:${toBangla(0).padStart(2, '0')}`,
-            {
-                fontSize: `${height * 0.7}px`,
-                fill: colors.darkBrown,
-                fontFamily: 'arial',
-                fontStyle: 'bold',
-                stroke: colors.cream,
-                strokeThickness: 1
-            }
-        ).setOrigin(0, 0.5);
-        this.timeHolder.add(this.timeLabel);
-
-        // Score holder (already handled by scoreContainer, but add star)
-        this.add.polygon(
-            0,
-            -height * 0.1,
-            [0, 0, 10, 30, 40, 30, 15, 45, 25, 70, 0, 50, -25, 70, -15, 45, -40, 30, -10, 30],
-            Phaser.Display.Color.HexStringToColor(colors.yellow).color
-        ).setOrigin(0.5).setScale(height * 0.22 / 50).setStrokeStyle(2, Phaser.Display.Color.HexStringToColor(colors.darkBrown).color);
-        this.scoreContainer.add(this.scoreLabel);
-
-        // Dial
-        this.dialHolder = this.add.container(0, 0).setSize(height, height);
-        this.timerContainer.add(this.dialHolder);
-
-        // Simulate ZIM Dial with Phaser graphics
-        this.dialBackground = this.add.circle(0, 0, height * 0.4, Phaser.Display.Color.HexStringToColor(colors.pink).color)
-            .setOrigin(0.5);
-        this.dialInner = this.add.circle(0, 0, height * 0.3, Phaser.Display.Color.HexStringToColor(colors.cream).darken(10).color)
-            .setOrigin(0.5);
-        this.dialIndicator = this.add.rectangle(0, -height * 0.35, 2, height * 0.1, Phaser.Display.Color.HexStringToColor(colors.darkBrown).color)
-            .setOrigin(0.5, 1);
-        this.dialHolder.add([this.dialBackground, this.dialInner, this.dialIndicator]);
-
-        // Stopwatch logic
-        this.stopwatch = this.time.addEvent({
+        // Stopwatch Logic
+        gameState.elapsed = 0; // Ensure elapsed time starts at 0
+        this.masterStopwatch = this.time.addEvent({
             delay: 1000,
             callback: () => {
-                gameState.elapsed = (gameState.elapsed || 0) + 1;
-                const percent = (gameState.elapsed / totalTime) * 100;
-                this.dialIndicator.rotation = (percent / 100) * 2 * Math.PI;
-                const minutes = Math.floor((totalTime - gameState.elapsed) / 60);
-                const seconds = (totalTime - gameState.elapsed) % 60;
-                this.timeLabel.setText(`সময়: ${toBangla(minutes)}:${toBangla(seconds).padStart(2, '0')}`);
-                if (gameState.elapsed >= totalTime) {
-                    this.stopwatch.remove();
-                    this.timeLabel.setText(`সময়: ${toBangla(0)}:${toBangla(0).padStart(2, '0')}`);
-                    gameState.currentQuestion?.handleTimeUp();
+                gameState.elapsed++;
+                const remaining = totalTime - gameState.elapsed;
+                const percent = (gameState.elapsed / totalTime);
+                
+                dialIndicator.rotation = percent * 2 * Math.PI;
+                const minutes = Math.floor(remaining / 60);
+                const seconds = remaining % 60;
+                timeLabel.setText(`সময়: ${toBangla(minutes)}:${toBangla(seconds).toString().padStart(2, '0')}`);
+
+                if (remaining <= 0) {
+                    this.masterStopwatch.remove();
+                    this.masterStopwatch = null;
+                    endStage(this, false); // End the stage with failure
                 }
             },
             callbackScope: this,
             loop: true,
-            startAt: 0,
             paused: true
         });
 
-        // Stopwatch methods
-        this.stopwatch.setTime = (seconds) => {
-            totalTime = seconds;
-            this.stopwatch.reset({
-                delay: 1000,
-                callback: this.stopwatch.callback,
-                callbackScope: this,
-                loop: true,
-                startAt: 0,
-                paused: true
-            });
+        // Helper methods for the timer
+        this.masterStopwatch.start = () => { this.masterStopwatch.paused = false; };
+        this.masterStopwatch.stop = () => { this.masterStopwatch.paused = true; };
+        this.masterStopwatch.reset = () => {
+            this.masterStopwatch.paused = true;
             gameState.elapsed = 0;
-            this.dialIndicator.rotation = 0;
-            this.timeLabel.setText(`সময়: ${toBangla(Math.floor(seconds / 60))}:${toBangla(seconds % 60).padStart(2, '0')}`);
+            dialIndicator.rotation = 0;
+            const minutes = Math.floor(totalTime / 60);
+            const seconds = totalTime % 60;
+            timeLabel.setText(`সময়: ${toBangla(minutes)}:${toBangla(seconds).toString().padStart(2, '0')}`);
         };
 
-        this.stopwatch.start = () => {
-            gameState.elapsed = 0;
-            this.stopwatch.paused = false;
-        };
-
-        this.stopwatch.stop = () => {
-            this.stopwatch.paused = true;
-        };
-
-        this.stopwatch.reset = () => {
-            this.stopwatch.stop();
-            gameState.elapsed = 0;
-            this.dialIndicator.rotation = 0;
-            this.timeLabel.setText(`সময়: ${toBangla(Math.floor(totalTime / 60))}:${toBangla(totalTime % 60).padStart(2, '0')}`);
-        };
-
-        this.stopwatch.getElapsedTime = () => gameState.elapsed || 0;
-
-        this.stopwatch.reset();
-        gameState.stopwatch = this.stopwatch; // Store for access in game.js
+        this.masterStopwatch.reset(); // Set initial text
     }
 
-    update() {
-        if (gameState.currentQuestion) {
-            gameState.currentQuestion.update();
+    update(time, delta) {
+        // console.log('chain 1 update');
+          if (gameState.gameActive && gameState.currentQuestion) {
+            gameState.currentQuestion.update(time, delta);
         }
-        this.scoreLabel.setText(`স্কোর: ${toBangla(gameState.score)}`);
-        this.statsLabels.question.setText(`প্রশ্ন: ${toBangla(gameState.questionCount)}`);
-        this.statsLabels.correct.setText(`সঠিক: ${toBangla(gameState.correctCount)}`);
-        this.statsLabels.incorrect.setText(`ভুল: ${toBangla(gameState.questionCount - gameState.correctCount)}`);
-        this.statsLabels.bonus.setText(`বোনাস: ${toBangla(gameState.streak * config.points.streakBonus)}`);
+
     }
 }
 

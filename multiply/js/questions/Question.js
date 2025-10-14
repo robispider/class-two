@@ -1,6 +1,9 @@
 // js/questions/Question.js
 import { toBangla, shuffle } from '../utils.js';
-class Question {
+import { config } from '../config.js';
+// import { gameState } from './gameState.js';
+
+class Question    {
     constructor(gameState, scene, callbacks, timeLimit, numQuestions, allowedTables) {
         this.gameState = gameState;
         this.scene = scene;
@@ -15,7 +18,7 @@ class Question {
         this.numQuestions = numQuestions;
         this.allowedTables = allowedTables;
         this.currentQuestionIndex = 0;
-        this.stopwatch = null;
+          this.questionTimer = null; // Renamed from stopwatch for clarity
         this.keyHandler = null;
         this.questionData = null;
         this.questionGenerator = gameState.questionGenerator;
@@ -42,8 +45,11 @@ class Question {
         // To be overridden by child classes
     }
 
-    cleanup() {
-        // To be overridden by child classes
+       cleanup() {
+        if (this.questionTimer) {
+            this.questionTimer.remove();
+            this.questionTimer = null;
+        }
     }
 
     nextQuestion() {
@@ -57,25 +63,12 @@ class Question {
         this.currentQuestionIndex++;
     }
 
-    handleTimeUp() {
-        const points = config.points.incorrect;
-        this.gameState.streak = 0;
-        this.handleIncorrect(points, "সময় শেষ!");
-        this.gameState.questionCount++;
-        const feedback = this.scene.add.text(this.scene.cameras.main.width / 2, this.scene.cameras.main.height / 2, "সময় শেষ!", {
-            fontSize: '60px',
-            fill: 'red',
-            backgroundColor: 'rgba(0,0,0,0.7)',
-            padding: { left: 20, right: 20, top: 20, bottom: 20 }
-        }).setOrigin(0.5);
-        this.scene.tweens.add({
-            targets: feedback,
-            alpha: 0,
-            duration: 1000,
-            onComplete: () => feedback.destroy()
-        });
-        this.transitionToNext(feedback);
+     handleTimeUp() {
+        // This is now ONLY called by a per-question timer.
+        this.handleIncorrect(config.points.incorrect, "সময় শেষ!");
+        this.transitionToNext();
     }
+
 
     generateOptions(correct) {
         const options = new Set([correct]);
@@ -103,6 +96,7 @@ class Question {
     }
 
     handleCorrect(points, feedbackText) {
+        //    this.cleanup(); // Stops the timer
         this.gameState.score = Math.max(0, this.gameState.score + points);
         this.gameState.correctCount++;
         this.gameState.streak++;
@@ -112,6 +106,7 @@ class Question {
     }
 
     handleIncorrect(points, feedbackText) {
+        //    this.cleanup(); // Stops the timer
         this.gameState.score = Math.max(0, this.gameState.score + points);
         this.gameState.streak = 0;
         this.callbacks.onIncorrect(points, feedbackText);
@@ -119,17 +114,11 @@ class Question {
         this.callbacks.onUpdateStats();
     }
 
-    transitionToNext(feedback) {
-        this.scene.tweens.add({
-            targets: feedback,
-            alpha: 0,
-            duration: 1000,
-            onComplete: () => {
-                feedback.destroy();
-                this.nextQuestion();
-            }
-        });
+   transitionToNext() {
+        // Wait for 1 second (1000ms) before calling the nextQuestion method.
+        this.scene.time.delayedCall(1000, this.nextQuestion, [], this);
     }
+
 
     completeSet() {
         this.cleanup();
@@ -141,6 +130,9 @@ class Question {
             padding: { left: 20, right: 20, top: 20, bottom: 20 }
         }).setOrigin(0.5);
         this.callbacks.onCompleteSet(feedback, success);
+    }
+      update(time, delta) {
+        // By default, do nothing.
     }
 }
 

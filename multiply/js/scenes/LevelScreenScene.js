@@ -2,7 +2,7 @@
 import { createBackgroundDecorations, toBangla } from '../utils.js';
 import { config } from '../config.js';
 import { gameState } from '../gameState.js';
-import { startStage } from '../game.js';
+
 
 class LevelScreenScene extends Phaser.Scene {
     constructor() {
