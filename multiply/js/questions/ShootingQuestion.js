@@ -38,6 +38,17 @@ class ShootingQuestion extends Question {
         // const rect=graphics.fillRect(50, 50, 400, 200);
        // this.uiLayer.add(rect);
         // console.log(this.uiLayer);
+
+          // Sound object references
+        this.backgroundMusic = null;
+        this.sirenSound = null;
+
+         this.collisionCategories = {
+            plane: 0x0001,  // Category for intact planes
+            missile: 0x0002, // Category for missiles
+            debris: 0x0004  // Category for shattered plane fragments
+        };
+
     }
 
     startQuestionSet() {
@@ -65,6 +76,9 @@ setup() {
         this.gameState.currentA = a;
         this.gameState.currentB = b;
         this.gameState.currentAnswer = target;
+
+        const width=this.scene.cameras.main.width;
+        const height=this.scene.cameras.main.height;
 //  const graphics = this.scene.make.graphics(); // Use make, as it won't be added to the scene automatically
 //         graphics.fillGradientStyle(
 //             Phaser.Display.Color.HexStringToColor('#87CEEB').color,
@@ -95,7 +109,11 @@ setup() {
 
         // Set up physics world
         
-
+ // Play looping background music and siren
+        this.backgroundMusic = this.scene.sound.add('game-music-4', { loop: true, volume: 0.6 });
+        this.sirenSound = this.scene.sound.add('air-raid-siren', { loop: true, volume: 0.2 });
+        this.backgroundMusic.play();
+        this.sirenSound.play();
         
 this.scene.matter.world.setBounds(0, 0, this.scene.cameras.main.width, this.scene.cameras.main.height, 32, false, false, false, true);
 // this.scene.matter.world.setBounds(0, 0, this.scene.cameras.main.width, this.scene.cameras.main.height, 32, {
@@ -203,14 +221,62 @@ this.scene.matter.world.setBounds(0, 0, this.scene.cameras.main.width, this.scen
         });
         this.duckLayer.add(this.debrisEmitter);
 
-        // Question text
+  
+  
+
+            // --- 1. Define constants for the panel for clarity and easy changes ---
+        const panelWidth = 300;
+        const panelHeight = 60;
+        // Use this.scale to be responsive, assuming 'width' and 'height' are from the scene scale
+        const panelX = width * 0.05;
+        const panelY = height * 0.8;
+        const padding = 15; // Inner spacing to prevent text from touching the edges
+
+        // --- 2. Create the panel background ---
+        const panelBg = this.scene.add.rectangle(
+            panelX,
+            panelY,
+            panelWidth,
+            panelHeight,
+            Phaser.Display.Color.HexStringToColor(config.colors.panel).color
+        )
+        .setOrigin(0, 0.5) // Origin at the left-middle edge
+        .setStrokeStyle(4, Phaser.Display.Color.HexStringToColor(config.colors.panelBorder).color);
+        panelBg.setAlpha(0.8);
+
+        this.uiLayer.add(panelBg);
+
+        // --- 3. Create and position the question text to be centered inside the panel ---
+        // Calculate the center coordinates of the panel
+        const textCenterX = panelX + (panelWidth / 2);
+        const textCenterY = panelY;
+
         this.questionText = this.scene.add.text(
-            this.scene.cameras.main.width / 2,
-            50,
-            `${toBangla(a)} × ${toBangla(b)} = ?`,
-            { fontSize: '50px', fill: config.colors.text, fontStyle: 'bold' }
-        ).setOrigin(0.5);
-        this.uiLayer.add(this.questionText);
+            textCenterX,
+            textCenterY,
+            `টারগেট: ${toBangla(a)} × ${toBangla(b)}`,
+            {
+                fontSize: '40px',
+                fill: config.colors.text,
+                  fontFamily: '"Noto Sans Bengali", sans-serif', 
+                fontStyle: 'bold',
+                align: 'center', // Horizontally center the text lines
+                wordWrap: {
+                    width: panelWidth - (padding * 2), // Set the maximum width for the text
+                    useAdvancedWrap: false // Provides better wrapping logic
+                },
+                   lineHeight: panelHeight,
+            }
+        ).setOrigin(0.5, 0.5); // Set the text's origin to its own center for perfect alignment
+   
+
+      
+    this.playQuestionRevealAnimation(this.questionText);
+
+
+
+
+this.uiLayer.add(this.questionText);
 
         // Spawn targets (planes)
         this.duckSpawner = this.scene.time.addEvent({
@@ -236,6 +302,10 @@ this.scene.matter.world.setBounds(0, 0, this.scene.cameras.main.width, this.scen
         const isMissileAndPlane =
             (bodyA.label === 'missile' && bodyB.label === 'plane') ||
             (bodyB.label === 'missile' && bodyA.label === 'plane');
+               const isPlaneAndDebri =
+            (bodyA.label === 'debris' && bodyB.label === 'plane') ||
+            (bodyB.label === 'debris' && bodyA.label === 'plane');
+
 
         if (isMissileAndPlane) {
             const planeBody = bodyA.label === 'plane' ? bodyA : bodyB;
@@ -253,6 +323,13 @@ this.scene.matter.world.setBounds(0, 0, this.scene.cameras.main.width, this.scen
                     const collisionPoint = pair.collision.supports[0];
 
                     // Immediately hide and schedule the destruction of the missile
+                       this.scene.sound.play('massive-explosion-3', { volume: 0.5 });
+
+                            if (missileSprite.rocketLoopSound) {
+                                missileSprite.rocketLoopSound.stop();
+                                missileSprite.rocketLoopSound.destroy();
+                            }
+                            
                     missileSprite.setVisible(false);
                     missileSprite.active = false; // Prevent re-triggering
                     if (missileSprite.trailEmitter) {
@@ -267,11 +344,27 @@ this.scene.matter.world.setBounds(0, 0, this.scene.cameras.main.width, this.scen
                     // Now, process the successful hit on the correct target.
                     this.processHit(targetSprite, collisionPoint.x, collisionPoint.y);
                 }
+                
                 // If it's NOT the target, we do nothing. The sensor missile continues on its path.
             }
         }
-    });
-};
+        else if (isPlaneAndDebri)
+        {
+             const planeBody = bodyA.label === 'plane' ? bodyA : bodyB;
+          
+
+            const targetSprite = planeBody.gameObject;
+             if (targetSprite && !targetSprite.hit) {
+                      //  this.scene.sound.play('massive-explosion-3', { volume: 0.3 }); // Play a smaller explosion sound for debris hit
+                        // Process the hit immediately. We don't need a missile reference here.
+                       
+                      // this.handleDebriCollisions(planeBody);
+                      // console.log('debris hit');
+                    }
+
+                    }
+                });
+            };
 
         this.scene.matter.world.on('collisionstart', this.handleCollision);
          if (gameState.timingModel === 'per-question') {
@@ -282,6 +375,26 @@ this.scene.matter.world.setBounds(0, 0, this.scene.cameras.main.width, this.scen
                 this
             );
         }
+
+    }
+    handleDebriCollisions(targetSprite)
+    {
+        // if (plane)
+        // {
+        //     plane.labelContainer.destroy();
+        //     plane.setMass(200);
+        //     plane.active=false;
+        // }
+        console.log(targetSprite);
+          if (targetSprite )
+  {
+        targetSprite.setVisible(false);
+        if (targetSprite.labelContainer)
+        {
+        targetSprite.labelContainer.setVisible(false);
+        }
+targetSprite.active=false;     
+  }
 
     }
      // js/questions/ShootingQuestion.js
@@ -699,14 +812,19 @@ usedPositions.sort((a, b) => a.y - b.y);
         group: -1 // This is the key! Objects with the same negative group never collide.
     }
     });
-    
+    //  plane.setCollisionCategory(this.collisionCategories.plane);
+    //     // A plane can collide with missiles AND debris
+    //     plane.setCollidesWith([this.collisionCategories.missile, this.collisionCategories.debris]);
+
+    const minScale = 0.04;  // Far
+const maxScale = 0.08;  // Near
+
     // 3. NOW, scale the sprite. This will scale BOTH the texture and the physics body.
-    const newScale = Phaser.Math.RND.realInRange(0.04, 0.06); //rand(0.04, 0.06);
+    const newScale = Phaser.Math.RND.realInRange(minScale, maxScale); //rand(0.04, 0.06);
     // console.log(newScale);
     plane.setScale(newScale);
 
-const minScale = 0.04;  // Far
-const maxScale = 0.06;  // Near
+
 const t = Phaser.Math.Clamp((maxScale - newScale) / (maxScale - minScale), 0, 1);  // Inverted: 0 = near (large/clear), 1 = far (small/intense haze)
 
 // Define colors with increased intensity
@@ -788,7 +906,7 @@ plane.setDepth(newScale);
         this.remainingBullets--;
         if (this.bulletIcons[this.remainingBullets]) this.bulletIcons[this.remainingBullets].destroy();
         if (this.remainingBullets === 0) this.reloadMagazine();
-
+   this.scene.sound.play('missile-firing', { volume: 0.4 });
         // const testMissile = this.scene.add.image(
         // this.MissileBattery.x,
         // this.MissileBattery.y - 100,
@@ -799,10 +917,10 @@ plane.setDepth(newScale);
 
         // Create the missile using the Matter factory for better control
         const missile = this.scene.matter.add.image(
-            this.MissileBattery.x,
-            this.MissileBattery.y - (this.MissileBattery.height * 0.75), // Adjust spawn position
+            this.MissileBattery.x+60,
+            this.MissileBattery.y - (this.MissileBattery.height * 0.3), // Adjust spawn position
             'missile'
-        ).setScale(.5).setOrigin(0.5, 0.5);
+        ).setScale(.5).setOrigin(0.5, 1);
 
         // Configure the physics body
     // missile.setBody({
@@ -829,7 +947,7 @@ missile.body.ignoreGravity = true;
 // Set initial rotation and physics body angle to point upward
     missile.setRotation(-Math.PI/2); // Nose up (assuming image nose is up)
     
-
+  
         // missile.setAngle(0);
 
         // Find and assign a target
@@ -846,17 +964,35 @@ missile.body.ignoreGravity = true;
         });
         missile.targetPlane = closest;
 
+
+             const rocketLoopSound = this.scene.sound.add('rocket-loop', { loop: true, volume: 0.07 });
+        rocketLoopSound.play();
+        missile.rocketLoopSound = rocketLoopSound; // Attach sound to missile for easy cleanup
+
         // Create and attach the trail emitter
-        const trail = this.scene.add.particles(0, 17, 'smoke', {
-            speed: { min: 10, max: 30 },
-            angle: { min: 80, max: 100 }, // Emits upwards relative to the particle system
-            lifespan: 500,
+        // const trail = this.scene.add.particles(0, 17, 'smoke', {
+        //     speed: { min: 10, max: 30 },
+        //     angle: { min: 80, max: 100 }, // Emits upwards relative to the particle system
+        //     lifespan: 500,
+        //     scale: { start: 0.1, end: 0 },
+        //     blendMode: 'ADD',
+        //     tint: [0xFF8800, 0xFFFF00, 0xFFFFFF], // Fire and smoke colors
+        //     frequency: 50,
+        // });
+            const trail = this.scene.add.particles(0, 17, 'smoke', {
+            speed: { min: 50, max: 90 },
+            // *** CHANGE 1: Angle changed to emit backwards from the emitter's direction ***
+            angle: { min: 170, max: 190 }, 
+            lifespan: 2000,
             scale: { start: 0.1, end: 0 },
             blendMode: 'ADD',
-            tint: [0xFF8800, 0xFFFF00, 0xFFFFFF], // Fire and smoke colors
-            frequency: 50,
+            tint: [0xFF8800, 0xFFFF00, 0xFFFFFF],
+            frequency: 100,
         });
-        trail.startFollow(missile,0,0);
+
+        // *** CHANGE 2: Use the config object to follow position AND rotation ***
+        // trail.startFollow(missile);
+
         missile.trailEmitter = trail; // Store reference for cleanup
         this.duckLayer.add(trail);
 
@@ -1000,18 +1136,6 @@ showFeedbackText(text, color, targetSprite) {
         if (index > -1) this.targets.splice(index, 1);
     }
 
-    // handleTimeUp() {
-    //    // this.callbacks.onCompleteSet('সময় শেষ!', false);
-    // }
- // js/questions/ShootingQuestion.js
-
-// js/questions/ShootingQuestion.js
-// js/questions/ShootingQuestion.js
-
-// js/questions/ShootingQuestion.js
-
-// js/questions/ShootingQuestion.js
-// js/questions/ShootingQuestion.js
 
 
 /**
@@ -1057,11 +1181,14 @@ shatterPlane(plane) {
                 collisionFilter: {
                     group: -2 // A new group just for fragments. They won't hit planes (group -1) or each other.
                 },
-                restitution: 0.5, // How bouncy it is
-                friction: .05,
+                  label: 'debris',
+                restitution: 0.8, // How bouncy it is
+                friction: .01,
                 frictionAir: .08
             });
-
+            // fragment.setCollisionCategory(this.collisionCategories.debris);
+                // Debris can hit planes OR other debris (for cool chain reactions)
+                // fragment.setCollidesWith([this.collisionCategories.plane, this.collisionCategories.debris]);
             // Set its visual scale to match the original plane
             fragment.setScale(plane.scaleX, plane.scaleY);
 
@@ -1081,7 +1208,7 @@ shatterPlane(plane) {
             fragment.applyForce(forceDirection.scale(thrust));
 
             // Give it a random spin
-            fragment.setAngularVelocity(Phaser.Math.RND.realInRange(-0.01, 0.01));
+            fragment.setAngularVelocity(Phaser.Math.RND.realInRange(-0.1, 0.1));
 
             // Add to our list for later cleanup
             fragments.push(fragment);
@@ -1120,11 +1247,29 @@ shatterPlane(plane) {
      // --- CORRECTED MISSILE UPDATE LOOP ---
         this.missiles.forEach((missile, index) => {
             if (!missile.active || !missile.body) {
+                 if (missile.rocketLoopSound) {
+                    missile.rocketLoopSound.stop();
+                    missile.rocketLoopSound.destroy();
+                }
+
                 // Clean up destroyed missiles from the array
                 if (missile.trailEmitter) missile.trailEmitter.destroy();
                 this.missiles.splice(index, 1);
                 return;
             }
+                   if (missile.trailEmitter) {
+               missile.trailEmitter.rotation = missile.rotation;
+
+                // 2. Calculate the tail's position.
+                const tailOffset = -15; // How far back from the missile's center the trail should be.
+                const tailX = missile.x + (tailOffset * Math.cos(missile.rotation));
+                const tailY = missile.y + (tailOffset * Math.sin(missile.rotation));
+
+                // 3. Set the emitter's position to the calculated tail coordinates.
+                missile.trailEmitter.setPosition(tailX, tailY);
+            
+        }
+
 
             // --- Phase 1: Vertical Ascent ---
             if (missile.ascentTime > 0) {
@@ -1186,8 +1331,13 @@ shatterPlane(plane) {
 
             // Continuous Flying Logic
             plane.flyTime++;
-            const verticalVelocity = plane.flyAmplitude * Math.sin(plane.flyTime * plane.flyFrequency);
-            plane.setVelocityY(verticalVelocity);
+            
+           
+              const verticalVelocity = plane.flyAmplitude * Math.sin(plane.flyTime * plane.flyFrequency);
+     plane.setVelocityY(verticalVelocity);
+            // Set position directly for smooth movement, overriding physics velocity for Y
+            //plane.setPosition(plane.body.position.x, newY);
+
             plane.setVelocityX(plane.body.velocity.x > 0 ? 2: -2);
             // if ( plane.flipX === true)
             // {
@@ -1294,7 +1444,73 @@ shatterPlane(plane) {
         }
     }
 // js/questions/ShootingQuestion.js
+// Add this new method inside your ShootingQuestion class
 
+/**
+ * Plays a reveal animation on a text object with a glowing flame effect.
+ * Clears any previous effects before applying new ones.
+ * @param {Phaser.GameObjects.Text} textObject The text object to animate.
+ */
+playQuestionRevealAnimation(textObject) {
+    // --- 1. Clean up any old effects from the previous question ---
+    // This is crucial to prevent effects from stacking up and causing visual bugs.
+    if (textObject.preFX) textObject.preFX.clear();
+    if (textObject.postFX) textObject.postFX.clear();
+
+    // --- 2. Add the pulsating GLOW effect ---
+    const fxGlow = textObject.postFX.addGlow(0xffffff, 0, 0, false, 0.1, 24);
+    this.scene.tweens.add({
+        targets: fxGlow,
+        outerStrength: 4,
+        yoyo: true,
+        loop: -1,
+        ease: 'sine.inout'
+    });
+
+    // --- 3. Create the FLAME PARTICLE EMITTER for the reveal ---
+    const flameEmitter = this.scene.add.particles(0, 0, 'particle', {
+        speed: { min: 100, max: 400 },      // How fast particles move
+    angle: { min: -85, max: -95 },    // Direction (270 is straight up)
+    scale: { start: 0.70, end: 0, ease: 'sine.out' },    // Start large, shrink to nothing
+      alpha: { start: 1, end: 0, ease: 'Quart.easeOut' },     // Start opaque, fade out
+    lifespan: 1000,                    // How long each particle lives (in ms)
+    frequency: 60,                    // Emit a particle every 60ms
+    blendMode: 'SCREEN',                 // Makes colors brighter when they overlap, perfect for fire/light
+    color: [ 0xfacc22, 0xf89800, 0xf83600, 0x9f0404 ],
+    });
+    flameEmitter.setDepth(this.uiLayer.depth + 1);
+    this.uiLayer.add(flameEmitter);
+
+    // --- 4. Add the REVEAL effect and SYNCHRONIZE the emitter ---
+    const fxReveal = textObject.preFX.addReveal();
+    const startX = textObject.getLeftCenter().x;
+    const textWidth = textObject.width;
+    const textY = textObject.y;
+
+    this.scene.tweens.add({
+        targets: fxReveal,
+        progress: 1,
+        duration: 1500,
+        hold: 200,
+        repeat: 0,
+        ease: 'Cubic.easeInOut',
+        onStart: () => {
+            flameEmitter.start();
+        },
+        onUpdate: (tween, target) => {
+            const currentX = startX + (textWidth * target.progress);
+            flameEmitter.setPosition(currentX, textY);
+        },
+        onComplete: () => {
+            flameEmitter.stop();
+            flameEmitter.killAll();
+            // Clean up the emitter after its last particles have faded
+            this.scene.time.delayedCall(1000, () => {
+                flameEmitter.destroy();
+            });
+        }
+    });
+}
     updateQuestion() {
         // Get the new data that was prepared in nextQuestion()
         const { a, b, target } = this.questionData;
@@ -1303,10 +1519,28 @@ shatterPlane(plane) {
         this.gameState.currentA = a;
         this.gameState.currentB = b;
         this.gameState.currentAnswer = target;
+          const fxWipe = this.questionText.preFX.addWipe(0.2, 1, 0); // (radius, wipe from left, wipe from top)
 
-        // Update the question text object that is already on the screen
-        this.questionText.setText(`${toBangla(a)} × ${toBangla(b)} = ?`);
+        this.scene.tweens.add({
+            targets: fxWipe,
+            progress: 1,
+            duration: 500, // Duration of the wipe-out effect
+            ease: 'Cubic.easeIn',
+            onComplete: () => {
+                // --- Mid-point of the transition ---
+                // 1. Play the alarm sound
+                this.scene.sound.play('alarm', { volume: 0.7 });
 
+                // 2. Update the text content
+                this.questionText.setText(`টারগেট: ${toBangla(a)} × ${toBangla(b)}`);
+                
+                // 3. Trigger the reveal animation for the new text
+                this.playQuestionRevealAnimation(this.questionText);
+            }
+        });
+
+
+   
         // Reset the question timer if you are using one
         if (this.questionTimer) {
             this.questionTimer.remove();
@@ -1323,6 +1557,15 @@ shatterPlane(plane) {
 
 cleanup() {
      super.cleanup(); 
+       if (this.backgroundMusic) {
+            this.backgroundMusic.stop();
+            this.backgroundMusic.destroy();
+        }
+        if (this.sirenSound) {
+            this.sirenSound.stop();
+            this.sirenSound.destroy();
+        }
+
              // Stop creating new planes
         if (this.duckSpawner) {
             this.duckSpawner.remove();

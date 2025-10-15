@@ -5,6 +5,35 @@ class PreloadScene extends Phaser.Scene {
         super('PreloadScene');
     }
     preload() {
+
+           WebFont.load({
+            google: {
+                families: ['Noto Sans Bengali:400,700'] // Specify the font families to wait for
+            },
+            active: () => {
+                // The 'active' callback is triggered when the fonts are loaded and ready.
+                // Now it's safe to start the next scene.
+                console.log('Fonts loaded successfully!');
+             
+            },
+            inactive: () => {
+                // The 'inactive' callback is triggered if the fonts fail to load.
+                // It's still safe to proceed, but the text will use a fallback font.
+                console.warn('Fonts failed to load, proceeding with fallback.');
+              
+            }
+        });
+//sound fx 
+        this.load.audio("missile-firing","assets/sounds/missile-firing.mp3");
+        this.load.audio("alarm","assets/sounds/retro-alarm-02.wav");
+        this.load.audio("rocket-loop","assets/sounds/rocket-loop.mp3");
+        this.load.audio("game-music-4","assets/sounds/game-music-loop-4.mp3");
+        this.load.audio("air-raid-siren","assets/sounds/air-raid-siren.mp3");
+        this.load.audio("massive-explosion-3","assets/sounds/massive-explosion-3.mp3");
+
+
+
+
         // Load all assets: fruitvegeset.png, planes, openbox.png, closebox.png, puzzel1.jpg, crowfly.png, missilebattery.png, missile.png, etc.
         this.load.image('fruitvegeset', 'assets/fruitvegeset.png');
         // Load planes
