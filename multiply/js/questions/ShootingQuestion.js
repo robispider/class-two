@@ -214,7 +214,7 @@ this.scene.matter.world.setBounds(0, 0, this.scene.cameras.main.width, this.scen
 
         // Spawn targets (planes)
         this.duckSpawner = this.scene.time.addEvent({
-            delay: 2000,
+            delay: 500,
             callback: () => {
                 console.log('spawnDuck called, targets:', this.targets.length);
                 this.spawnDuck();
@@ -343,7 +343,7 @@ this.scene.matter.world.setBounds(0, 0, this.scene.cameras.main.width, this.scen
 
         // --- 2. Stationary Mountains (Painted from back to front) ---
         const fargroundMountains = this.scene.add.image(-rand(0,2048-width), height-100, 'farground_mountains').setOrigin(0, 1);
-        //   fargroundMountains.setTint(0xcccccc);
+           fargroundMountains.setTint(0x1971b8);
         // fargroundMountains.displayWidth = width;
         this.backgroundLayer.add(fargroundMountains);
 
@@ -358,7 +358,8 @@ this.scene.matter.world.setBounds(0, 0, this.scene.cameras.main.width, this.scen
                 end: 0.05
             },
             treeCount: 200,
-            hazeColor: 0x406a73
+            hazeColor: 0x1575c2,
+            endColor:0x2177a8
         };
 
         // Pass the configuration to the paintForest method
@@ -408,7 +409,9 @@ this.scene.matter.world.setBounds(0, 0, this.scene.cameras.main.width, this.scen
                 end: 0.10
             },
             treeCount: 400,
-            hazeColor: 0x406a73
+              hazeColor: 0x1271c1,
+            
+endColor: 0x05568b
         };
 
         // Pass the configuration to the paintForest method
@@ -449,7 +452,7 @@ this.scene.matter.world.setBounds(0, 0, this.scene.cameras.main.width, this.scen
                 end: 0.1
             },
             treeCount:200,
-            hazeColor: 0x406a73
+         
         };
 
           this.paintForest(this.foregroundLayer, groundPlantingSurface, 'groundcolor', foregroundBushConfig);
@@ -462,6 +465,44 @@ this.scene.matter.world.setBounds(0, 0, this.scene.cameras.main.width, this.scen
 
         this.clouds = [];
     }
+
+    /**
+ * Applies a vertical gradient overlay via mask (paints only on sprite's non-alpha pixels).
+ * Fast GPU masking.
+ * @param {Phaser.GameObjects.Sprite|Image} target - The sprite to gradient.
+ * @param {number} startColor - Top color (0xRRGGBB).
+ * @param {number} endColor - Bottom color (0xRRGGBB).
+ * @param {number} intensity - Overlay alpha (0-1, e.g., 0.5 for blend).
+ */
+applyGradientMaskToSprite(target, startColor, endColor, intensity = 0.5) {
+    const scene = this.scene; // Assuming called in scene context
+    const bounds = target.getBounds(); // Get size/pos
+
+    // Create gradient graphics (built-in Phaser)
+    const gradGraphics = scene.make.graphics({ x: 0, y: 0, add: false });
+    gradGraphics.fillGradientStyle(startColor, startColor, endColor, endColor, intensity);
+    gradGraphics.fillRect(0, 0, bounds.width, bounds.height);
+
+    // Generate texture from graphics
+    const gradKey = `${target.texture.key}_gradMask`;
+    gradGraphics.generateTexture(gradKey, bounds.width, bounds.height);
+    gradGraphics.destroy();
+
+    // Create overlay sprite and mask it to target's shape (respects alpha!)
+    const overlay = scene.add.sprite(target.x, target.y, gradKey).setOrigin(target.originX, target.originY);
+    overlay.setBlendMode(Phaser.BlendModes.MULTIPLY); // Or OVERLAY for haze blend
+    overlay.mask = new Phaser.Display.Masks.BitmapMask(scene, target); // Key: Only shows on non-alpha!
+
+    // Position align
+    overlay.setPosition(target.x, target.y);
+    overlay.setScale(target.scaleX, target.scaleY);
+
+    // Add to same layer as target for depth
+    target.parentContainer.add(overlay); // Or your layer: this.backgroundLayer.add(overlay);
+
+    return overlay; // Return to tweak/tint further
+}
+
     // js/questions/ShootingQuestion.js
 // js/questions/ShootingQuestion.js
 // js/questions/ShootingQuestion.js
@@ -660,10 +701,42 @@ usedPositions.sort((a, b) => a.y - b.y);
     });
     
     // 3. NOW, scale the sprite. This will scale BOTH the texture and the physics body.
-    const newScale = 0.06;
+    const newScale = Phaser.Math.RND.realInRange(0.04, 0.06); //rand(0.04, 0.06);
+    // console.log(newScale);
     plane.setScale(newScale);
 
+const minScale = 0.04;  // Far
+const maxScale = 0.06;  // Near
+const t = Phaser.Math.Clamp((maxScale - newScale) / (maxScale - minScale), 0, 1);  // Inverted: 0 = near (large/clear), 1 = far (small/intense haze)
 
+// Define colors with increased intensity
+const nearColor = Phaser.Display.Color.ValueToColor(0xffffff);  // Clear/white (no haze)
+const farColor = Phaser.Display.Color.ValueToColor(0x66bbff);   // Stronger, deeper bluish haze (increased intensity vs. original 0xaaddff)
+
+// Interpolate with higher weight on far for more intensity
+let hazeColor = Phaser.Display.Color.Interpolate.ColorWithColor(nearColor, farColor, 1, t);
+
+// Amplify intensity further: Desaturate and darken the result for far objects (simulates haze absorption)
+if (t > 0.5) {  // Only boost on medium-far to avoid over-darkening near ones
+    const intensityBoost = t * 0.5;  // Scale the boost with distance (0-0.5)
+    hazeColor.r = Phaser.Math.Clamp(hazeColor.r * (1 - intensityBoost), 0, 255);  // Darken red
+    hazeColor.g = Phaser.Math.Clamp(hazeColor.g * (1 - intensityBoost * 0.5), 0, 255);  // Lessen green
+    hazeColor.b = Phaser.Math.Clamp(hazeColor.b * (1 - intensityBoost * 0.2), 0, 255);  // Keep blue dominant but tint stronger
+    // Optional: Reduce overall brightness
+    const brightnessFactor = 1 - intensityBoost * 0.4;
+    hazeColor.r *= brightnessFactor;
+    hazeColor.g *= brightnessFactor;
+    hazeColor.b *= brightnessFactor;
+}
+
+const tintValue = Phaser.Display.Color.GetColor(
+    Math.round(hazeColor.r),
+    Math.round(hazeColor.g),
+    Math.round(hazeColor.b)
+);
+
+plane.setTint(tintValue);  // Applies intensified blend to non-alpha pixels
+plane.setDepth(newScale);
 
         if (!fromLeft) plane.flipX = true;
         
@@ -729,7 +802,7 @@ usedPositions.sort((a, b) => a.y - b.y);
             this.MissileBattery.x,
             this.MissileBattery.y - (this.MissileBattery.height * 0.75), // Adjust spawn position
             'missile'
-        ).setScale(1).setOrigin(0.5, 0.5);
+        ).setScale(.5).setOrigin(0.5, 0.5);
 
         // Configure the physics body
     // missile.setBody({
@@ -745,12 +818,12 @@ usedPositions.sort((a, b) => a.y - b.y);
  missile.setSensor(true);
 
         missile.setFrictionAir(0.2);
-        missile.setMass(50);
+        missile.setMass(20);
         missile.setFixedRotation(); // We control rotation manually
 missile.body.ignoreGravity = true;
 
         // Set custom properties for our update loop
-        missile.ascentTime = 20; // Frames for vertical ascent
+        missile.ascentTime = 10; // Frames for vertical ascent
         missile.targetPlane = null;
 
 // Set initial rotation and physics body angle to point upward
@@ -1002,13 +1075,13 @@ shatterPlane(plane) {
 
             // Calculate a force vector pointing from the plane's center to the fragment's center
             const forceDirection = new Phaser.Math.Vector2(offsetX, offsetY).normalize();
-            const thrust = Phaser.Math.RND.realInRange(0.003, 0.005); // Randomize explosion force
+            const thrust = Phaser.Math.RND.realInRange(0.0003, 0.0005); // Randomize explosion force
 
             // Apply the force to send it flying outwards
             fragment.applyForce(forceDirection.scale(thrust));
 
             // Give it a random spin
-            fragment.setAngularVelocity(Phaser.Math.RND.realInRange(-0.1, 0.1));
+            fragment.setAngularVelocity(Phaser.Math.RND.realInRange(-0.01, 0.01));
 
             // Add to our list for later cleanup
             fragments.push(fragment);
@@ -1055,7 +1128,7 @@ shatterPlane(plane) {
 
             // --- Phase 1: Vertical Ascent ---
             if (missile.ascentTime > 0) {
-                const upwardForce = 0.2;
+                const upwardForce = 0.1;
                 // Apply force straight up, regardless of rotation
                 missile.applyForce(new Phaser.Math.Vector2(0, -upwardForce));
                 missile.ascentTime--;
@@ -1072,11 +1145,11 @@ shatterPlane(plane) {
 
                 // Set angular velocity to turn the missile.
                 // This creates a smooth turning motion.
-                const turnSpeed = 0.09; // Adjust for how fast the missile turns
+                const turnSpeed = 0.07; // Adjust for how fast the missile turns
                 missile.setAngularVelocity(angleDifference * turnSpeed);
 
                 // Apply thrust in the direction the missile is currently facing
-                const thrustForce = 0.2; // Adjust for missile speed
+                const thrustForce = 0.05; // Adjust for missile speed
                 const force = new Phaser.Math.Vector2();
                 force.x = Math.cos(missile.rotation) * thrustForce;
                 force.y = Math.sin(missile.rotation) * thrustForce;
