@@ -119,9 +119,8 @@ export function startQuestionSet(scene, mode, stage, allowedTables) {
     } else if (stage === 4) {
         QuestionClass = PuzzleQuestion;
         gameState.timingModel = 'per-set';
+   
     } else if (stage === 5) {
-        QuestionClass = CascadeQuestion;
-    } else if (stage === 6) {
         QuestionClass = ShootingQuestion;
     } else {
         console.error('No valid QuestionClass for stage:', stage);

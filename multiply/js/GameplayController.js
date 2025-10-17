@@ -9,7 +9,7 @@ class GameplayController {
             [11, 12, 13, 14, 15], // Tables for Level 3
             [16, 17, 18, 19, 20]  // Tables for Level 4
         ];
-        this.stagesPerLevel = 6;
+        this.stagesPerLevel = 5;
         this.requiredCorrectPercent = 80;
         this.unlocked = {};
     }
