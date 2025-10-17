@@ -4,13 +4,25 @@ import { config } from '../config.js';
 import { toBangla } from '../utils.js';
 import { startStage, endStage } from '../game.js'; // Ensure endStage is imported
 
+// Import the new UI components
+import { Stopwatch } from '../ui/Stopwatch.js';
+
 class GameScene extends Phaser.Scene {
     constructor() {
         super('GameScene');
         this.UiDepth=300;
+
+            // Properties to hold timer and UI references
+        this.stopwatchUI = null;
+        this.progressBarUI = null;
+        this.questionTimer = null;
+        this.questionTimeLimit = 0;
+
     }
 
     create(data) {
+         gameState.timeLimit = config.initialTimeLimit;
+         
         // --- 1. Responsive Layout Setup ---
         const { width, height } = this.scale;
         const padding = Math.min(width, height) * 0.02; // SafeArea padding
@@ -66,9 +78,17 @@ class GameScene extends Phaser.Scene {
             }
         ).setOrigin(0.5, 0.5);
         this.headerContainer.add(this.scoreLabel);
+    
+
 
         // Stats Panel (Below Score)
         this.createStatsPanel(padding, headerHeight * 0.60);
+
+             const uiX = this.scoreLabel.x;
+        const uiY = headerHeight * 0.75;
+        this.masterUI = new Stopwatch(this, uiX, uiY);
+        this.headerContainer.add(this.masterUI.stopwatchContainer);
+        this.headerContainer.add(this.masterUI.progressBarContainer);
 
 
         // --- 3. Footer Section ---
@@ -150,11 +170,49 @@ class GameScene extends Phaser.Scene {
         );
 
         // Now that gameState.timeLimit is set, create the timer logic
-        if (gameState.timingModel === 'per-set' && this.stopwatchUI) {
-            this.setupPerSetTimer(gameState.timeLimit, this.stopwatchUI);
+          if (gameState.timingModel === 'per-set') {
+            const stopwatchWidth = width * 0.3; // Made slightly wider for the text
+            const stopwatchHeight = headerHeight * 0.7;
+            const stopwatchX = (width - padding) - stopwatchWidth;
+            const stopwatchY = (headerHeight / 2) - (stopwatchHeight / 2);
+
+            // Hide the per-question UI, as we're using the master per-set timer.
+            this.masterUI.stopwatchContainer.setVisible(false);
+            this.masterUI.progressBarContainer.setVisible(false);
+
+            // Create and position the dedicated per-set stopwatch UI.
+            this.stopwatchUI = this.createStopwatchUI(stopwatchX, stopwatchY, stopwatchWidth, stopwatchHeight);
+            this.headerContainer.add(this.stopwatchUI.container);
+
+            // Calculate total time for the entire set.
+            const totalTime = gameState.timeLimit * config.questionsPerSession;
+            this.setupPerSetTimer(totalTime, this.stopwatchUI);
             if (this.masterStopwatch) {
                 this.masterStopwatch.start();
             }
+        }
+    }
+  
+    startQuestionTimer(duration) {
+        if (this.masterUI) {
+            const onTimeUp = () => {
+                if (gameState.currentQuestion && gameState.gameActive) {
+                    gameState.currentQuestion.handleTimeUp();
+                }
+            };
+            this.masterUI.start(duration, onTimeUp);
+        }
+    }
+
+    stopQuestionTimer() {
+        if (this.masterUI) {
+            this.masterUI.stop();
+        }
+    }
+
+    updateGameProgress() {
+        if (this.masterUI) {
+            this.masterUI.updateGameProgress(gameState.questionCount, config.questionsPerSession);
         }
     }
 
@@ -308,27 +366,18 @@ class GameScene extends Phaser.Scene {
 
 
     update(time, delta) {
-        if (gameState.gameActive) {
-            // Update current question logic (e.g., for animations within a question)
-            if (gameState.currentQuestion) {
-                gameState.currentQuestion.update(time, delta);
-            }
-
-            // --- Smooth Stopwatch Animation ---
-            if (this.masterStopwatch && !this.masterStopwatch.paused) {
-                // Get elapsed time since the last 1-second tick
-                const elapsedSinceTick = this.masterStopwatch.getElapsed();
-                // Total elapsed time in fractional seconds
-                const totalElapsedSeconds = gameState.elapsed + (elapsedSinceTick / 1000);
-                const totalDuration = this.masterStopwatch.delay * this.masterStopwatch.loop / 1000;
-                const percent = totalElapsedSeconds / gameState.timeLimit;
-                
-                if (this.stopwatchUI && this.stopwatchUI.dialIndicator) {
-                    // Smoothly rotate the dial
-                    this.stopwatchUI.dialIndicator.rotation = percent * 2 * Math.PI;
-                }
-            }
+           if (this.masterUI) {
+            this.masterUI.update();
         }
+
+        // Allow the current question to have its own update loop (for animations, etc.)
+        if (gameState.currentQuestion) {
+            gameState.currentQuestion.update(time, delta);
+        }
+
+      
+        
+    
     }
 }
 

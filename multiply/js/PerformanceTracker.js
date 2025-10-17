@@ -6,11 +6,38 @@ class PerformanceTracker {
             levelHigh: {},
             overallHigh: 0,
             problematicProblems: [],
-            statistics: {}
+            statistics: {},
+            
         };
+        this.responses = [];
+        this.problematicPairs = {};
+        this.highScores = {};
+        
         this.loadFromLocal();
     }
+    /**
+     * Logs a single question response.
+     * @param {number} a The first number in the multiplication.
+     * @param {number} b The second number in the multiplication.
+     * @param {number} selected The answer the user provided.
+     * @param {number} time The time taken to answer.
+     * @param {boolean} correct Whether the answer was correct.
+     */
+    logResponse(a, b, selected, time, correct) {
+        this.responses.push({
+            a,
+            b,
+            answer: a * b,
+            selected,
+            time,
+            correct,
+            timestamp: Date.now()
+        });
 
+        if (!correct) {
+            this.addProblematic(a, b);
+        }
+    }
     loadFromLocal() {
         const saved = localStorage.getItem('mathGameData');
         if (saved) {

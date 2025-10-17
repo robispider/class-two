@@ -5,6 +5,48 @@ class PreloadScene extends Phaser.Scene {
         super('PreloadScene');
     }
     preload() {
+const { width, height } = this.scale;
+
+        // --- Loading Bar ---
+        const progressBar = this.add.graphics();
+        const progressBox = this.add.graphics();
+        progressBox.fillStyle(0x222222, 0.8);
+        progressBox.fillRect(width / 2 - 160, height / 2 - 30, 320, 50);
+
+        const loadingText = this.make.text({
+            x: width / 2,
+            y: height / 2 - 50,
+            text: 'Loading...',
+            style: {
+                font: '20px monospace',
+                fill: '#ffffff'
+            }
+        }).setOrigin(0.5, 0.5);
+
+        const percentText = this.make.text({
+            x: width / 2,
+            y: height / 2 - 5,
+            text: '0%',
+            style: {
+                font: '18px monospace',
+                fill: '#ffffff'
+            }
+        }).setOrigin(0.5, 0.5);
+
+        this.load.on('progress', function(value) {
+            percentText.setText(parseInt(value * 100) + '%');
+            progressBar.clear();
+            progressBar.fillStyle(0xffffff, 1);
+            progressBar.fillRect(width / 2 - 150, height / 2 - 20, 300 * value, 30);
+        });
+
+        this.load.on('complete', function() {
+            progressBar.destroy();
+            progressBox.destroy();
+            loadingText.destroy();
+            percentText.destroy();
+        });
+
 
            WebFont.load({
             google: {
@@ -23,6 +65,9 @@ class PreloadScene extends Phaser.Scene {
               
             }
         });
+                
+
+
 //sound fx 
         this.load.audio("missile-firing","assets/sounds/missile-firing.mp3");
         this.load.audio("alarm","assets/sounds/retro-alarm-02.wav");
@@ -35,21 +80,31 @@ class PreloadScene extends Phaser.Scene {
 
 
         // Load all assets: fruitvegeset.png, planes, openbox.png, closebox.png, puzzel1.jpg, crowfly.png, missilebattery.png, missile.png, etc.
-        this.load.image('fruitvegeset', 'assets/fruitvegeset.png');
+        this.load.spritesheet('items_spritesheet', 'assets/fruitvegeset.png',
+            {
+                  frameWidth: 64, // Example: If your image is 320px wide, 320 / 5 cols = 64
+            frameHeight: 64 // Example: If your image is 576px high, 576 / 9 rows = 64
+            }
+        );
+         this.load.image('puzzle1',"assets/puzzle/puzzle1.jpg");
+
         // Load planes
         planes.forEach(plane => this.load.image(plane, `assets/${plane}`));
-        this.load.image('openbox', 'assets/openbox.png');
-        this.load.image('closebox', 'assets/closebox.png');
+        this.load.image('box_open', 'assets/openbox.png');
+        this.load.image('box_closed', 'assets/closebox.png');
         this.load.image('puzzel1', 'assets/puzzel1.jpg');
         this.load.image('crowfly', 'assets/crowfly.png');
         // Assume particle textures like 'particle', 'smoke', 'casing', 'cloud', 'crosshair'
         this.load.image('particle', 'assets/particle.png');
+        this.load.image('flarewatch', 'assets/flarewatch.png');
+
         this.load.image('smoke', 'assets/smoke.png');
         this.load.image('casing', 'assets/casing.png');
         this.load.image('cloud', 'assets/cloud.png');
         this.load.image('crosshair', 'assets/crosshair.png');
         this.load.image('missilebattery', 'assets/missilebattery.png');
         this.load.image('missile', 'assets/missile.png');
+             this.load.image('airspy', 'assets/airspy.png');
         // Load other assets as needed
  this.load.image('groundcolor',"assets/groundcolor.png");
 

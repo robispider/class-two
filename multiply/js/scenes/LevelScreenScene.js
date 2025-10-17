@@ -12,6 +12,7 @@ class LevelScreenScene extends Phaser.Scene {
     create(data) {
         const level = data.level || 1;
         gameState.currentLevel = level;
+        
 
         // Add background decorations
         createBackgroundDecorations(this, this.cameras.main.width, this.cameras.main.height);
@@ -38,6 +39,7 @@ class LevelScreenScene extends Phaser.Scene {
                 fontStyle: 'bold'
             }).setOrigin(0.5);
             button.on('pointerdown', () => {
+                // gameState.allowedTables=gameState.controller.levels[i];
                 this.scene.start('StageScreenScene', { level: levelNum });
             });
             button.on('pointerover', () => button.setFillStyle(Phaser.Display.Color.HexStringToColor(config.colors.option1).darken(20).color));
