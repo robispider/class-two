@@ -154,7 +154,7 @@ class PuzzleQuestion extends Question {
             pieceContainer.add(puzzlePiece);
             pieceContainer.setSize(puzzlePiece.displayWidth, puzzlePiece.displayHeight);
             this.vizContainer.add(pieceContainer);
-            const piecePlaceholderX = container.x + rowContainer.x + (container.width * 0.3);
+            const piecePlaceholderX = container.x + rowContainer.x + (container.width * 0.7);
             const piecePlaceholderY = container.y + rowContainer.y + (rowH / 2);
             pieceContainer.setPosition(piecePlaceholderX, piecePlaceholderY);
             pieceContainer.initposition={x:piecePlaceholderX, y:piecePlaceholderY}
@@ -218,24 +218,6 @@ class PuzzleQuestion extends Question {
         const textStartPos = this.vizContainer.getLocalPoint(textWorldPos.tx, textWorldPos.ty);
         textToAnimate.setPosition(textStartPos.x, textStartPos.y);
     
-    
-           
-        const emitter = this.scene.add.particles(400, 300, 'particle', {
-            frame: 'red',
-            blendMode: 'ADD',
-            lifespan: 1500,
-            frequency: 16,
-            scale: { start: 0.5, end: 0.1 },
-            stopAfter: 32
-        });
-        this.vizContainer.add(emitter);
-
-        emitter.setPosition(textWorldPos.x, textWorldPos.y);
-
-  
-
-
-      
 
         // Animate the text towards the piece's final destination
         this.scene.tweens.add({
@@ -243,12 +225,12 @@ class PuzzleQuestion extends Question {
             x:  piece.initposition.x,
             y:  piece.initposition.y,
             alpha: 1,
-            scale: 0.8,
+            scale: 1,
             duration: 300,
             ease: 'Power2.easeIn',
             onComplete: (console.log('text animation complete',textToAnimate))
         });
-               emitter.startFollow(textToAnimate);
+        
         // Only fade out the background of the visual block now
         this.scene.tweens.add({ targets: visualBlock.getData('bg'), alpha: 0, duration: 200 });
         
