@@ -115,10 +115,11 @@ export function startQuestionSet(scene, mode, stage, allowedTables) {
     if (stage <= 2 || (mode === "practice" && stage <= 3)) {
         QuestionClass = StandardQuestion;
     } else if (stage === 3) {
-        QuestionClass = FactorPairsQuestion;
-    } else if (stage === 4) {
-        QuestionClass = PuzzleQuestion;
+         QuestionClass = PuzzleQuestion;
         gameState.timingModel = 'per-set';
+    } else if (stage === 4) {
+       
+        QuestionClass = FactorPairsQuestion;
    
     } else if (stage === 5) {
         QuestionClass = ShootingQuestion;

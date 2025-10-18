@@ -47,7 +47,7 @@ class LevelScreenScene extends Phaser.Scene {
         }
 
         // Practice Mode Button
-        const practiceButton = this.add.rectangle(this.cameras.main.width / 2, startY + maxLevels * buttonSpacing, 200, 80, Phaser.Display.Color.HexStringToColor(config.colors.option2).color)
+          const practiceButton = this.add.rectangle(this.cameras.main.width / 2, startY + maxLevels * buttonSpacing, 200, 80, Phaser.Display.Color.HexStringToColor(config.colors.option2).color)
             .setOrigin(0.5)
             .setInteractive();
         const practiceText = this.add.text(this.cameras.main.width / 2, startY + maxLevels * buttonSpacing, 'প্র্যাকটিস মোড', {
@@ -56,8 +56,10 @@ class LevelScreenScene extends Phaser.Scene {
             fontStyle: 'bold'
         }).setOrigin(0.5);
         practiceButton.on('pointerdown', () => {
-            this.scene.start('PracticeScreenScene', { level });
+            // UPDATED LINE: Starts the new practice scene
+            this.scene.start('PracticeScene');
         });
+
 
         // Back Button
         const backButton = this.add.rectangle(this.cameras.main.width / 2, startY + (maxLevels + 1) * buttonSpacing, 200, 80, Phaser.Display.Color.HexStringToColor(config.colors.stopButton).color)

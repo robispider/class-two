@@ -10,6 +10,8 @@ import PracticeScreenScene from './scenes/PracticeScreenScene.js';
 import StatsScreenScene from './scenes/StatsScreenScene.js';
 import LeaderboardScreenScene from './scenes/LeaderboardScreenScene.js';
 import GameScene from './scenes/GameScene.js';
+import PracticeScene from './scenes/PracticeScene.js'; 
+
 
 // import MatterCollisionPlugin from 'phaser-matter-collision-plugin';
 
@@ -27,7 +29,8 @@ const phaserConfig = {
         PracticeScreenScene,
         StatsScreenScene,
         LeaderboardScreenScene,
-        GameScene
+        GameScene,
+        PracticeScene 
     ],
     scale: {
         mode: Phaser.Scale.FIT,
