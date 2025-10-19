@@ -113,6 +113,10 @@ const { width, height } = this.scale;
         this.load.image('tree3',"assets/tree/tree3.png");
         this.load.image('plents1',"assets/tree/plents1.png");
 
+               this.load.image('green-arrow-start', 'assets/arrow/green-arrow-start.png');
+               this.load.image('green-arrow-mid', 'assets/arrow/green-arrow-mid.png');
+               this.load.image('green-arrow-point', 'assets/arrow/green-arrow-point.png');
+
 
 
         this.load.image('farground_cloud_1',"assets/sky_background/parallax_parts/farground_cloud_1.png");

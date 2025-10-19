@@ -70,10 +70,7 @@ class PracticeQuestion extends Question {
         container.add(gridContainer);
         this.createdObjects.push(gridContainer);
 
-        // NEW: Add a dedicated container for hover overlays
-        this.hoverOverlayContainer = this.scene.add.container(0, 0);
-        this.hoverOverlayContainer.setDepth(100).setVisible(true).setAlpha(1);;
-        gridContainer.add(this.hoverOverlayContainer);
+
 
         const colors = [0xFFC312, 0xF79F1F, 0xEE5A24, 0xEA2027, 0xC4E538, 0xA3CB38, 0x009432, 0x0652DD, 0x1B1464, 0x6F1E51, 0x3B3B98, 0x182C61, 0xFC427B, 0xD6A2E8, 0xBDC581, 0xFEA47F, 0x25CCF7, 0x55E6C1, 0x9AECDB, 0x58B19F];
         const textStyle = { fontSize: `${cellSize * 0.4}px`, fontFamily: '"Noto Sans Bengali", sans-serif', fill: '#FFFFFF', fontStyle: 'bold' };
@@ -141,74 +138,76 @@ class PracticeQuestion extends Question {
                 cell.setDepth(1);
                         }
         }
+
+                // NEW: Add a dedicated container for hover overlays
+        this.hoverOverlayContainer = this.scene.add.container(0, 0);
+        this.hoverOverlayContainer.setDepth(100).setVisible(true).setAlpha(1);;
+        gridContainer.add(this.hoverOverlayContainer);
     }
 
     // REWRITTEN: Creates temporary overlays instead of changing cell colors
-   highlightGridCross(row, col, cellSize) {
+  // REWRITTEN: Creates temporary overlays that stop at the intersection point.
+highlightGridCross(row, col, cellSize) {
     this.clearGridCrossHighlights();
-    console.log(`highlightGridCross called with row=${row}, col=${col}`);
 
     const rowHeader = this.gridElements.rowHeaders[row];
     const colHeader = this.gridElements.colHeaders[col];
 
     if (!rowHeader || !colHeader) {
-        console.error(`Invalid header: rowHeader=${!!rowHeader}, colHeader=${!!colHeader}, row=${row}, col=${col}`);
         return;
     }
 
+    // Highlight the row and column headers with a glow
     if (rowHeader) rowHeader.first.postFX.addGlow(0xffffff, 2);
     if (colHeader) colHeader.first.postFX.addGlow(0xffffff, 2);
 
     const rowHeaderColor = rowHeader ? rowHeader.first.fillColor : 0xFF0000;
     const colHeaderColor = colHeader ? colHeader.first.fillColor : 0x00FF00;
-    console.log('highlight started for gridcells for each', this.gridElements.cells, 'length:', this.gridElements.cells.length);
 
     if (this.gridElements.cells.length === 0) {
-        console.error('gridElements.cells is empty');
         return;
     }
-
-    // Test overlay to confirm rendering
-// Test overlay directly on scene
-    const testOverlay = this.scene.add.rectangle(100, 100, 50, 50, 0xFF0000, 1).setDepth(1000);
-    this.scene.add.existing(testOverlay);
-    console.log('Added test overlay at 100, 100 directly to scene');
 
     this.gridElements.cells.forEach(cell => {
         const cellData = {
             isCell: cell.getData('isCell'),
             row: cell.getData('row'),
-            col: cell.getData('col'),
-            value: cell.getData('value')
+            col: cell.getData('col')
         };
+        
         if (!cellData.isCell || cellData.row === undefined || cellData.col === undefined) {
-            console.log('No cellData for cell:', cell, 'customData:', cell.customData, 'DataManager:', cellData);
             return;
         }
-        console.log('celldata found:', cellData);
-        let overlayColor = null;
-        let alpha = 0.5;
 
-        if (cellData.row === row) overlayColor = rowHeaderColor;
-        if (cellData.col === col) overlayColor = colHeaderColor;
-        if (cellData.row === row && cellData.col === col) {
+        let overlayColor = null;
+        let alpha = 0.3;
+
+        // =========================================================================
+        // == MODIFIED: Conditions now check if the cell is between the header    ==
+        // == and the hovered cell.                                               ==
+        // =========================================================================
+        const isInRowSegment = (cellData.row === row && cellData.col <= col);
+        const isInColSegment = (cellData.col === col && cellData.row <= row);
+
+        if (isInRowSegment) {
+            overlayColor = rowHeaderColor;
+        }
+        
+        // The column highlight will draw over the row highlight if both are true (except for the intersection)
+        if (isInColSegment) {
+            overlayColor = colHeaderColor;
+        }
+        
+        // Special, brighter color for the exact intersection point
+        if (isInRowSegment && isInColSegment) {
             overlayColor = 0xFFFF00;
-            alpha = 0.5;
+            alpha = 0.4; // Make it slightly more prominent
         }
 
-        // if (overlayColor !== null) {
-        //     const overlay = this.scene.add.rectangle(cell.x, cell.y, cellSize, cellSize, overlayColor, alpha);
-        //     console.log(`Adding overlay at ${cell.x}, ${cell.y} with color ${overlayColor.toString(16)}`);
-        //     this.hoverOverlayContainer.add(overlay);
-        // }
         if (overlayColor !== null) {
-            // Add overlay directly to scene
-            const worldPoint = cell.getWorldTransformMatrix();
-            const scenePoint = this.scene.qaRegion.getLocalPoint(worldPoint.tx, worldPoint.ty);
-            const overlay = this.scene.add.rectangle(scenePoint.x, scenePoint.y, cellSize, cellSize, overlayColor, alpha).setDepth(100);
-            this.scene.add.existing(overlay);
-            this.hoverOverlayContainer.add(overlay); // Still add to container for cleanup
-            console.log(`Adding overlay at ${scenePoint.x}, ${scenePoint.y} with color ${overlayColor.toString(16)}`);
+            const overlay = this.scene.add.rectangle(cell.x, cell.y, cellSize, cellSize, overlayColor, alpha).setDepth(100);
+            overlay.setBlendMode(Phaser.BlendModes.MULTIPLY);
+            this.hoverOverlayContainer.add(overlay);
         }
     });
 }
@@ -473,79 +472,106 @@ clearGridHighlights() {
             if (selectedCell) this.scene.tweens.add({ targets: selectedCell, angle: 5, yoyo: true, duration: 60, repeat: 3 });
         }
     }
+playSuccessAnimation() {
+    const { a, b, target } = this.questionData;
+    const rowFactor = a;
+    const colFactor = b;
 
-    playSuccessAnimation() {
-        const { a, b, target } = this.questionData;
-        const rowFactor = a;
-        const colFactor = b;
+    const correctCell = this.gridElements.cells.find(c => c.getData('value') === target && c.getData('row') === rowFactor && c.getData('col') === colFactor);
+    const rowHeader = this.gridElements.rowHeaders[rowFactor];
+    const colHeader = this.gridElements.colHeaders[colFactor];
 
-        const correctCell = this.gridElements.cells.find(c => c.getData('value') === target && c.getData('row') === rowFactor && c.getData('col') === colFactor);
-        const rowHeader = this.gridElements.rowHeaders[rowFactor];
-        const colHeader = this.gridElements.colHeaders[colFactor];
+    if (!correctCell || !rowHeader || !colHeader) {
+        console.warn("Could not find all grid elements for animation. Skipping.");
+        this.transitionToNext();
+        return;
+    }
 
-        if (!correctCell || !rowHeader || !colHeader) {
-            console.warn("Could not find all grid elements for animation. Skipping.");
-            this.transitionToNext();
-            return;
-        }
+    // --- COORDINATE SETUP ---
+    const cellMatrix = correctCell.getWorldTransformMatrix(); // This has the GLOBAL position
+    const rowHeaderMatrix = rowHeader.getWorldTransformMatrix();
+    const colHeaderMatrix = colHeader.getWorldTransformMatrix();
 
-        const cellMatrix = correctCell.getWorldTransformMatrix();
-        const rowHeaderMatrix = rowHeader.getWorldTransformMatrix();
-        const colHeaderMatrix = colHeader.getWorldTransformMatrix();
+    // This is for objects INSIDE qaContainer (arrows, particles)
+    const finalCellPos = this.qaContainer.getLocalPoint(cellMatrix.tx, cellMatrix.ty);
+    const finalRowHeaderPos = this.qaContainer.getLocalPoint(rowHeaderMatrix.tx - rowHeader.width * .5, rowHeaderMatrix.ty);
+    const finalColHeaderPos = this.qaContainer.getLocalPoint(colHeaderMatrix.tx, colHeaderMatrix.ty - colHeader.height * .5);
 
-        const finalCellPos = this.qaContainer.getLocalPoint(cellMatrix.tx, cellMatrix.ty);
-        const finalRowHeaderPos = this.qaContainer.getLocalPoint(rowHeaderMatrix.tx, rowHeaderMatrix.ty);
-        const finalColHeaderPos = this.qaContainer.getLocalPoint(colHeaderMatrix.tx, colHeaderMatrix.ty);
+    // --- ARROW ANIMATION ---
+    const createAndAnimateArrow = (startX, startY, endX, endY) => {
+        const arrowScale = 0.2;
+        const arrowContainer = this.scene.add.container(startX, startY).setDepth(5);
+        this.qaContainer.add(arrowContainer);
 
-        const graphics = this.scene.add.graphics().setDepth(1);
-        this.qaContainer.add(graphics);
+        const angle = Phaser.Math.Angle.Between(startX, startY, endX, endY);
+        const distance = Phaser.Math.Distance.Between(startX, startY, endX, endY);
+        arrowContainer.setRotation(angle);
 
-        const arrowThickness = 5;
-        const arrowColor = 0x00ff00;
-
-        this.scene.tweens.addCounter({
-            from: 0, to: 1, duration: 400, ease: 'Sine.easeInOut',
-            onUpdate: tween => {
-                const p = tween.getValue();
-                const x2 = finalRowHeaderPos.x + (finalCellPos.x - finalRowHeaderPos.x) * p;
-                const y2 = finalRowHeaderPos.y + (finalCellPos.y - finalRowHeaderPos.y) * p;
-                graphics.clear().lineStyle(arrowThickness, arrowColor, 1)
-                       .lineBetween(finalRowHeaderPos.x, finalRowHeaderPos.y, x2, y2);
-            }
-        });
-
-        this.scene.tweens.addCounter({
-            from: 0, to: 1, duration: 400, delay: 100, ease: 'Sine.easeInOut',
-            onUpdate: tween => {
-                const p = tween.getValue();
-                const x2 = finalColHeaderPos.x + (finalCellPos.x - finalColHeaderPos.x) * p;
-                const y2 = finalColHeaderPos.y + (finalCellPos.y - finalColHeaderPos.y) * p;
-                graphics.lineStyle(arrowThickness, arrowColor, 1)
-                       .lineBetween(finalColHeaderPos.x, finalColHeaderPos.y, x2, y2);
-            }
-        });
-
-        this.scene.time.delayedCall(400, () => {
-            const emitter = this.scene.add.particles(finalCellPos.x, finalCellPos.y, 'particle', {
-                speed: { min: 100, max: 200 }, lifespan: 800, scale: { start: 1, end: 0 },
-                blendMode: 'ADD', emitting: false,
-                emitZone: { type: 'edge', source: new Phaser.Geom.Circle(0, 0, 40), quantity: 30 }
-            });
-            this.qaContainer.add(emitter);
-            emitter.explode(30);
-            this.scene.time.delayedCall(1000, () => emitter.destroy());
-        });
+        const start = this.scene.add.image(0, 0, 'green-arrow-start').setOrigin(0, 0.5).setScale(arrowScale);
+        const mid = this.scene.add.image(start.displayWidth, 0, 'green-arrow-mid').setOrigin(0, 0.5).setScale(arrowScale);
+        const point = this.scene.add.image(start.displayWidth, 0, 'green-arrow-point').setOrigin(0, 0.5).setScale(arrowScale);
         
-        // FIX: Add text to scene, not container, for correct centering
+        arrowContainer.add([start, mid, point]);
+        arrowContainer.setBlendMode(Phaser.BlendModes.MULTIPLY);
+
+        const requiredMidWidth = distance - start.displayWidth - point.displayWidth;
+        mid.displayWidth = 0;
+
+        this.scene.tweens.add({
+            targets: mid,
+            displayWidth: requiredMidWidth > 0 ? requiredMidWidth : 0,
+            duration: 400,
+            ease: 'Sine.easeInOut',
+            onUpdate: () => {
+                point.x = start.displayWidth + mid.displayWidth;
+            },
+            onComplete: () => {
+                this.scene.tweens.add({
+                    targets: arrowContainer,
+                    alpha: 0,
+                    duration: 300,
+                    delay: 1000,
+                    onComplete: () => {
+                        arrowContainer.destroy();
+                    }
+                });
+            }
+        });
+    };
+
+    createAndAnimateArrow(finalRowHeaderPos.x, finalRowHeaderPos.y, finalCellPos.x, finalCellPos.y);
+    this.scene.time.delayedCall(100, () => {
+        createAndAnimateArrow(finalColHeaderPos.x, finalColHeaderPos.y, finalCellPos.x, finalCellPos.y);
+    });
+
+    // --- PARTICLE ANIMATION ---
+    this.scene.time.delayedCall(400, () => {
+        const emitter = this.scene.add.particles(finalCellPos.x, finalCellPos.y, 'particle', {
+            speed: { min: 100, max: 200 }, lifespan: 800, scale: { start: 1, end: 0 },
+            blendMode: 'ADD', emitting: false,
+            emitZone: { type: 'edge', source: new Phaser.Geom.Circle(0, 0, 40), quantity: 30 }
+        });
+        this.qaContainer.add(emitter);
+        emitter.explode(30);
+        this.scene.time.delayedCall(1000, () => emitter.destroy());
+    });
+    
+    // --- ANSWER TEXT ANIMATION ---
+    this.scene.time.delayedCall(500, () => {
         const { width, height } = this.scene.scale;
-        const answerText = this.scene.add.text(width / 2, height / 2, toBangla(target), {
+        
+        // =========================================================================
+        // == CORRECTED: Use the cell's GLOBAL coordinates (cellMatrix.tx/ty)   ==
+        // == for the starting position of the text added to the main scene.    ==
+        // =========================================================================
+        const answerText = this.scene.add.text(cellMatrix.tx, cellMatrix.ty, toBangla(target), {
             fontSize: '250px', 
             fontFamily: '"Noto Sans Bengali", sans-serif',
             fontStyle: 'bold', 
             stroke: '#FFFFFF', 
             strokeThickness: 12,
             align: 'center'
-        }).setOrigin(0.5).setAlpha(0).setScale(0.2).setDepth(1000); 
+        }).setOrigin(0.5).setAlpha(0).setScale(0.1).setDepth(1000); 
 
         const gradient = answerText.context.createLinearGradient(0, 0, 0, answerText.height);
         gradient.addColorStop(0, '#FEE12B');
@@ -555,18 +581,22 @@ clearGridHighlights() {
         
         this.scene.tweens.add({
             targets: answerText,
+            x: width / 2,       // Animate to center of the SCREEN
+            y: height / 2,      // Animate to center of the SCREEN
             alpha: 1, 
-            scale: 1, 
-            duration: 800, 
+            scale: 1,
+            duration: 800, // Adjusted duration for a better feel
             ease: 'Elastic.easeOut',
             easeParams: [1.2, 0.6], 
             onComplete: () => {
                 this.scene.tweens.add({ targets: answerText, alpha: 0, duration: 500, delay: 600, onComplete: () => answerText.destroy() });
             }
         });
+    });
 
-        this.scene.time.delayedCall(2000, () => this.transitionToNext());
-    }
+    this.scene.time.delayedCall(2000, () => this.transitionToNext());
+}
+  
 
     transitionToNext() {
         this.scene.tweens.add({
