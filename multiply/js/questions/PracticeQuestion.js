@@ -2,7 +2,7 @@ import { Question } from './Question.js';
 import { config } from '../config.js';
 import { gameState } from '../gameState.js';
 import { toBangla, shuffle, rand } from '../utils.js';
-
+import { ScoreCalculator } from '../ScoreCalculator.js';
 class PracticeQuestion extends Question {
     constructor(...args) {
         super(...args);
@@ -22,13 +22,21 @@ class PracticeQuestion extends Question {
         this.optionsContainer = null;
         this.lastQuestionA = null;
         this.questionsSinceLastError = 0;
-        this.hoverOverlayContainer = null; // NEW: Container for non-destructive hover effects
+        this.hoverOverlayContainer = null;
+        this.music = null; // NEW: Property to hold the music instance
     }
 
     startQuestionSet() {
         this.gameState.questionCount = 0;
         this.gameState.correctCount = 0;
         this.gameState.score = 0;
+
+        // --- NEW: Start background music ---
+        if (!this.music || !this.music.isPlaying) {
+            this.music = this.scene.sound.add('standard-gackground', { loop: true, volume: 0.4 });
+            this.music.play();
+        }
+        
         this.setup();
         this.displayNextQuestion();
     }
@@ -108,17 +116,12 @@ class PracticeQuestion extends Question {
                     const value = row * col;
                     text = toBangla(value);
                     cell.setData({ isCell: true, row: row, col: col, value: value });
-                    // Attempt DataManager for debugging
-                cell.setData('isCell', true);
-                cell.setData('row', row);
-                cell.setData('col', col);
-                cell.setData('value', value);
-                console.log(`Set cell data: row=${row}, col=${col}, value=${value}, customData:`, cell.customData, `DataManager:`, {
-                    isCell: cell.getData('isCell'),
-                    row: cell.getData('row'),
-                    col: cell.getData('col'),
-                    value: cell.getData('value')
-                }, `Has DataManager:`, !!cell.data);
+                    
+                    cell.setData('isCell', true);
+                    cell.setData('row', row);
+                    cell.setData('col', col);
+                    cell.setData('value', value);
+                    
                     this.gridElements.cells.push(cell);
                 }
 
@@ -136,81 +139,71 @@ class PracticeQuestion extends Question {
                         });
                 }
                 cell.setDepth(1);
-                        }
+            }
         }
-
-                // NEW: Add a dedicated container for hover overlays
+        
         this.hoverOverlayContainer = this.scene.add.container(0, 0);
         this.hoverOverlayContainer.setDepth(100).setVisible(true).setAlpha(1);;
         gridContainer.add(this.hoverOverlayContainer);
     }
+    
+    highlightGridCross(row, col, cellSize) {
+        this.clearGridCrossHighlights();
 
-    // REWRITTEN: Creates temporary overlays instead of changing cell colors
-  // REWRITTEN: Creates temporary overlays that stop at the intersection point.
-highlightGridCross(row, col, cellSize) {
-    this.clearGridCrossHighlights();
+        const rowHeader = this.gridElements.rowHeaders[row];
+        const colHeader = this.gridElements.colHeaders[col];
 
-    const rowHeader = this.gridElements.rowHeaders[row];
-    const colHeader = this.gridElements.colHeaders[col];
-
-    if (!rowHeader || !colHeader) {
-        return;
-    }
-
-    // Highlight the row and column headers with a glow
-    if (rowHeader) rowHeader.first.postFX.addGlow(0xffffff, 2);
-    if (colHeader) colHeader.first.postFX.addGlow(0xffffff, 2);
-
-    const rowHeaderColor = rowHeader ? rowHeader.first.fillColor : 0xFF0000;
-    const colHeaderColor = colHeader ? colHeader.first.fillColor : 0x00FF00;
-
-    if (this.gridElements.cells.length === 0) {
-        return;
-    }
-
-    this.gridElements.cells.forEach(cell => {
-        const cellData = {
-            isCell: cell.getData('isCell'),
-            row: cell.getData('row'),
-            col: cell.getData('col')
-        };
-        
-        if (!cellData.isCell || cellData.row === undefined || cellData.col === undefined) {
+        if (!rowHeader || !colHeader) {
             return;
         }
 
-        let overlayColor = null;
-        let alpha = 0.3;
+        if (rowHeader) rowHeader.first.postFX.addGlow(0xffffff, 2);
+        if (colHeader) colHeader.first.postFX.addGlow(0xffffff, 2);
 
-        // =========================================================================
-        // == MODIFIED: Conditions now check if the cell is between the header    ==
-        // == and the hovered cell.                                               ==
-        // =========================================================================
-        const isInRowSegment = (cellData.row === row && cellData.col <= col);
-        const isInColSegment = (cellData.col === col && cellData.row <= row);
+        const rowHeaderColor = rowHeader ? rowHeader.first.fillColor : 0xFF0000;
+        const colHeaderColor = colHeader ? colHeader.first.fillColor : 0x00FF00;
 
-        if (isInRowSegment) {
-            overlayColor = rowHeaderColor;
-        }
-        
-        // The column highlight will draw over the row highlight if both are true (except for the intersection)
-        if (isInColSegment) {
-            overlayColor = colHeaderColor;
-        }
-        
-        // Special, brighter color for the exact intersection point
-        if (isInRowSegment && isInColSegment) {
-            overlayColor = 0xFFFF00;
-            alpha = 0.4; // Make it slightly more prominent
+        if (this.gridElements.cells.length === 0) {
+            return;
         }
 
-        if (overlayColor !== null) {
-            const overlay = this.scene.add.rectangle(cell.x, cell.y, cellSize, cellSize, overlayColor, alpha).setDepth(100);
-            overlay.setBlendMode(Phaser.BlendModes.MULTIPLY);
-            this.hoverOverlayContainer.add(overlay);
-        }
-    });
-}
+        this.gridElements.cells.forEach(cell => {
+            const cellData = {
+                isCell: cell.getData('isCell'),
+                row: cell.getData('row'),
+                col: cell.getData('col')
+            };
+            
+            if (!cellData.isCell || cellData.row === undefined || cellData.col === undefined) {
+                return;
+            }
+
+            let overlayColor = null;
+            let alpha = 0.3;
+
+            const isInRowSegment = (cellData.row === row && cellData.col <= col);
+            const isInColSegment = (cellData.col === col && cellData.row <= row);
+
+            if (isInRowSegment) {
+                overlayColor = rowHeaderColor;
+            }
+            
+            if (isInColSegment) {
+                overlayColor = colHeaderColor;
+            }
+            
+            if (isInRowSegment && isInColSegment) {
+                overlayColor = 0xFFFF00;
+                alpha = 0.4; 
+            }
+
+            if (overlayColor !== null) {
+                const overlay = this.scene.add.rectangle(cell.x, cell.y, cellSize, cellSize, overlayColor, alpha).setDepth(100);
+                overlay.setBlendMode(Phaser.BlendModes.MULTIPLY);
+                this.hoverOverlayContainer.add(overlay);
+            }
+        });
+    }
 
     clearGridCrossHighlights() {
         this.gridElements.rowHeaders.forEach(h => h && h.first.postFX.clear());
@@ -218,26 +211,26 @@ highlightGridCross(row, col, cellSize) {
         this.hoverOverlayContainer.removeAll(true);
     }
     
- highlightOptionsInGrid(options, colors) {
-    options.forEach((optValue, index) => {
-        const cells = this.gridElements.cells.filter(c => c.getData('value') === optValue);
-        cells.forEach(cell => {
-            if (cell) {
-                const bg = cell.first;
-                bg.setFillStyle(Phaser.Display.Color.HexStringToColor(colors[index]).color);
-                bg.postFX.addGlow(Phaser.Display.Color.HexStringToColor(colors[index]).color, 4);
-            }
+    highlightOptionsInGrid(options, colors) {
+        options.forEach((optValue, index) => {
+            const cells = this.gridElements.cells.filter(c => c.getData('value') === optValue);
+            cells.forEach(cell => {
+                if (cell) {
+                    const bg = cell.first;
+                    bg.setFillStyle(Phaser.Display.Color.HexStringToColor(colors[index]).color);
+                    bg.postFX.addGlow(Phaser.Display.Color.HexStringToColor(colors[index]).color, 4);
+                }
+            });
         });
-    });
-}
+    }
 
-clearGridHighlights() {
-    this.gridElements.cells.forEach(cell => {
-        const bg = cell.first;
-        bg.setFillStyle(bg.getData('originalColor'));
-        bg.postFX.clear();
-    });
-}
+    clearGridHighlights() {
+        this.gridElements.cells.forEach(cell => {
+            const bg = cell.first;
+            bg.setFillStyle(bg.getData('originalColor'));
+            bg.postFX.clear();
+        });
+    }
 
     createSkillIndicator() {
         const barWidth = 300;
@@ -383,8 +376,15 @@ clearGridHighlights() {
             button.answerValue = opt;
             this.optionsContainer.add(button);
 
-            button.on('pointerdown', () => this.checkAnswer(opt));
-            button.on('pointerover', () => this.scene.tweens.add({ targets: button, scale: 1.05, duration: 150 }));
+            // --- MODIFIED: Added sound effects ---
+            button.on('pointerdown', () => {
+                this.scene.sound.play('button-click');
+                this.checkAnswer(opt);
+            });
+            button.on('pointerover', () => {
+                this.scene.sound.play('button-hover', { volume: 0.7 });
+                this.scene.tweens.add({ targets: button, scale: 1.05, duration: 150 });
+            });
             button.on('pointerout', () => this.scene.tweens.add({ targets: button, scale: 1, duration: 150 }));
         });
 
@@ -465,6 +465,9 @@ clearGridHighlights() {
             this.updateSkillIndicator();
             this.callbacks.onIncorrect(0, "ভুল! আবার চেষ্টা করুন।");
             
+            // --- NEW: Play incorrect answer sound ---
+            this.scene.sound.play('button-shake');
+
             const selectedButton = this.optionsContainer.getAll().find(b => b.answerValue === selected);
             const selectedCell = this.gridElements.cells.find(c => c.getData('value') === selected);
             
@@ -472,132 +475,126 @@ clearGridHighlights() {
             if (selectedCell) this.scene.tweens.add({ targets: selectedCell, angle: 5, yoyo: true, duration: 60, repeat: 3 });
         }
     }
-playSuccessAnimation() {
-    const { a, b, target } = this.questionData;
-    const rowFactor = a;
-    const colFactor = b;
 
-    const correctCell = this.gridElements.cells.find(c => c.getData('value') === target && c.getData('row') === rowFactor && c.getData('col') === colFactor);
-    const rowHeader = this.gridElements.rowHeaders[rowFactor];
-    const colHeader = this.gridElements.colHeaders[colFactor];
+    playSuccessAnimation() {
+        // --- NEW: Play success sound ---
+        this.scene.sound.play('applause', { volume: 0.6 });
+        
+        const { a, b, target } = this.questionData;
+        const rowFactor = a;
+        const colFactor = b;
 
-    if (!correctCell || !rowHeader || !colHeader) {
-        console.warn("Could not find all grid elements for animation. Skipping.");
-        this.transitionToNext();
-        return;
+        const correctCell = this.gridElements.cells.find(c => c.getData('value') === target && c.getData('row') === rowFactor && c.getData('col') === colFactor);
+        const rowHeader = this.gridElements.rowHeaders[rowFactor];
+        const colHeader = this.gridElements.colHeaders[colFactor];
+
+        if (!correctCell || !rowHeader || !colHeader) {
+            console.warn("Could not find all grid elements for animation. Skipping.");
+            this.transitionToNext();
+            return;
+        }
+
+        const cellMatrix = correctCell.getWorldTransformMatrix(); 
+        const rowHeaderMatrix = rowHeader.getWorldTransformMatrix();
+        const colHeaderMatrix = colHeader.getWorldTransformMatrix();
+
+        const finalCellPos = this.qaContainer.getLocalPoint(cellMatrix.tx, cellMatrix.ty);
+        const finalRowHeaderPos = this.qaContainer.getLocalPoint(rowHeaderMatrix.tx - rowHeader.width * .5, rowHeaderMatrix.ty);
+        const finalColHeaderPos = this.qaContainer.getLocalPoint(colHeaderMatrix.tx, colHeaderMatrix.ty - colHeader.height * .5);
+
+        const createAndAnimateArrow = (startX, startY, endX, endY) => {
+            const arrowScale = 0.2;
+            const arrowContainer = this.scene.add.container(startX, startY).setDepth(5);
+            this.qaContainer.add(arrowContainer);
+
+            const angle = Phaser.Math.Angle.Between(startX, startY, endX, endY);
+            const distance = Phaser.Math.Distance.Between(startX, startY, endX, endY);
+            arrowContainer.setRotation(angle);
+
+            const start = this.scene.add.image(0, 0, 'green-arrow-start').setOrigin(0, 0.5).setScale(arrowScale);
+            const mid = this.scene.add.image(start.displayWidth, 0, 'green-arrow-mid').setOrigin(0, 0.5).setScale(arrowScale);
+            const point = this.scene.add.image(start.displayWidth, 0, 'green-arrow-point').setOrigin(0, 0.5).setScale(arrowScale);
+            
+            arrowContainer.add([start, mid, point]);
+            arrowContainer.setBlendMode(Phaser.BlendModes.MULTIPLY);
+
+            const requiredMidWidth = distance - start.displayWidth - point.displayWidth;
+            mid.displayWidth = 0;
+
+            this.scene.tweens.add({
+                targets: mid,
+                displayWidth: requiredMidWidth > 0 ? requiredMidWidth : 0,
+                duration: 400,
+                ease: 'Sine.easeInOut',
+                onUpdate: () => {
+                    point.x = start.displayWidth + mid.displayWidth;
+                },
+                onComplete: () => {
+                    this.scene.tweens.add({
+                        targets: arrowContainer,
+                        alpha: 0,
+                        duration: 300,
+                        delay: 1000,
+                        onComplete: () => {
+                            arrowContainer.destroy();
+                        }
+                    });
+                }
+            });
+        };
+
+        createAndAnimateArrow(finalRowHeaderPos.x, finalRowHeaderPos.y, finalCellPos.x, finalCellPos.y);
+        this.scene.time.delayedCall(100, () => {
+            createAndAnimateArrow(finalColHeaderPos.x, finalColHeaderPos.y, finalCellPos.x, finalCellPos.y);
+        });
+
+        this.scene.time.delayedCall(400, () => {
+            const emitter = this.scene.add.particles(finalCellPos.x, finalCellPos.y, 'particle', {
+                speed: { min: 100, max: 200 }, lifespan: 800, scale: { start: 1, end: 0 },
+                blendMode: 'ADD', emitting: false,
+                emitZone: { type: 'edge', source: new Phaser.Geom.Circle(0, 0, 40), quantity: 30 }
+            });
+            this.qaContainer.add(emitter);
+            emitter.explode(30);
+            this.scene.time.delayedCall(1000, () => emitter.destroy());
+        });
+        
+        this.scene.time.delayedCall(500, () => {
+            const { width, height } = this.scene.scale;
+            
+            const answerText = this.scene.add.text(cellMatrix.tx, cellMatrix.ty, toBangla(target), {
+                fontSize: '250px', 
+                fontFamily: '"Noto Sans Bengali", sans-serif',
+                fontStyle: 'bold', 
+                stroke: '#FFFFFF', 
+                strokeThickness: 12,
+                align: 'center'
+            }).setOrigin(0.5).setAlpha(0).setScale(0.1).setDepth(1000); 
+
+            const gradient = answerText.context.createLinearGradient(0, 0, 0, answerText.height);
+            gradient.addColorStop(0, '#FEE12B');
+            gradient.addColorStop(0.5, '#F58D3D');
+            gradient.addColorStop(1, '#F04E51');
+            answerText.setFill(gradient);
+            
+            this.scene.tweens.add({
+                targets: answerText,
+                x: width / 2,
+                y: height / 2,
+                alpha: 1, 
+                scale: 1,
+                duration: 800,
+                ease: 'Elastic.easeOut',
+                easeParams: [1.2, 0.6], 
+                onComplete: () => {
+                    this.scene.tweens.add({ targets: answerText, alpha: 0, duration: 500, delay: 600, onComplete: () => answerText.destroy() });
+                }
+            });
+        });
+
+        this.scene.time.delayedCall(2000, () => this.transitionToNext());
     }
-
-    // --- COORDINATE SETUP ---
-    const cellMatrix = correctCell.getWorldTransformMatrix(); // This has the GLOBAL position
-    const rowHeaderMatrix = rowHeader.getWorldTransformMatrix();
-    const colHeaderMatrix = colHeader.getWorldTransformMatrix();
-
-    // This is for objects INSIDE qaContainer (arrows, particles)
-    const finalCellPos = this.qaContainer.getLocalPoint(cellMatrix.tx, cellMatrix.ty);
-    const finalRowHeaderPos = this.qaContainer.getLocalPoint(rowHeaderMatrix.tx - rowHeader.width * .5, rowHeaderMatrix.ty);
-    const finalColHeaderPos = this.qaContainer.getLocalPoint(colHeaderMatrix.tx, colHeaderMatrix.ty - colHeader.height * .5);
-
-    // --- ARROW ANIMATION ---
-    const createAndAnimateArrow = (startX, startY, endX, endY) => {
-        const arrowScale = 0.2;
-        const arrowContainer = this.scene.add.container(startX, startY).setDepth(5);
-        this.qaContainer.add(arrowContainer);
-
-        const angle = Phaser.Math.Angle.Between(startX, startY, endX, endY);
-        const distance = Phaser.Math.Distance.Between(startX, startY, endX, endY);
-        arrowContainer.setRotation(angle);
-
-        const start = this.scene.add.image(0, 0, 'green-arrow-start').setOrigin(0, 0.5).setScale(arrowScale);
-        const mid = this.scene.add.image(start.displayWidth, 0, 'green-arrow-mid').setOrigin(0, 0.5).setScale(arrowScale);
-        const point = this.scene.add.image(start.displayWidth, 0, 'green-arrow-point').setOrigin(0, 0.5).setScale(arrowScale);
-        
-        arrowContainer.add([start, mid, point]);
-        arrowContainer.setBlendMode(Phaser.BlendModes.MULTIPLY);
-
-        const requiredMidWidth = distance - start.displayWidth - point.displayWidth;
-        mid.displayWidth = 0;
-
-        this.scene.tweens.add({
-            targets: mid,
-            displayWidth: requiredMidWidth > 0 ? requiredMidWidth : 0,
-            duration: 400,
-            ease: 'Sine.easeInOut',
-            onUpdate: () => {
-                point.x = start.displayWidth + mid.displayWidth;
-            },
-            onComplete: () => {
-                this.scene.tweens.add({
-                    targets: arrowContainer,
-                    alpha: 0,
-                    duration: 300,
-                    delay: 1000,
-                    onComplete: () => {
-                        arrowContainer.destroy();
-                    }
-                });
-            }
-        });
-    };
-
-    createAndAnimateArrow(finalRowHeaderPos.x, finalRowHeaderPos.y, finalCellPos.x, finalCellPos.y);
-    this.scene.time.delayedCall(100, () => {
-        createAndAnimateArrow(finalColHeaderPos.x, finalColHeaderPos.y, finalCellPos.x, finalCellPos.y);
-    });
-
-    // --- PARTICLE ANIMATION ---
-    this.scene.time.delayedCall(400, () => {
-        const emitter = this.scene.add.particles(finalCellPos.x, finalCellPos.y, 'particle', {
-            speed: { min: 100, max: 200 }, lifespan: 800, scale: { start: 1, end: 0 },
-            blendMode: 'ADD', emitting: false,
-            emitZone: { type: 'edge', source: new Phaser.Geom.Circle(0, 0, 40), quantity: 30 }
-        });
-        this.qaContainer.add(emitter);
-        emitter.explode(30);
-        this.scene.time.delayedCall(1000, () => emitter.destroy());
-    });
-    
-    // --- ANSWER TEXT ANIMATION ---
-    this.scene.time.delayedCall(500, () => {
-        const { width, height } = this.scene.scale;
-        
-        // =========================================================================
-        // == CORRECTED: Use the cell's GLOBAL coordinates (cellMatrix.tx/ty)   ==
-        // == for the starting position of the text added to the main scene.    ==
-        // =========================================================================
-        const answerText = this.scene.add.text(cellMatrix.tx, cellMatrix.ty, toBangla(target), {
-            fontSize: '250px', 
-            fontFamily: '"Noto Sans Bengali", sans-serif',
-            fontStyle: 'bold', 
-            stroke: '#FFFFFF', 
-            strokeThickness: 12,
-            align: 'center'
-        }).setOrigin(0.5).setAlpha(0).setScale(0.1).setDepth(1000); 
-
-        const gradient = answerText.context.createLinearGradient(0, 0, 0, answerText.height);
-        gradient.addColorStop(0, '#FEE12B');
-        gradient.addColorStop(0.5, '#F58D3D');
-        gradient.addColorStop(1, '#F04E51');
-        answerText.setFill(gradient);
-        
-        this.scene.tweens.add({
-            targets: answerText,
-            x: width / 2,       // Animate to center of the SCREEN
-            y: height / 2,      // Animate to center of the SCREEN
-            alpha: 1, 
-            scale: 1,
-            duration: 800, // Adjusted duration for a better feel
-            ease: 'Elastic.easeOut',
-            easeParams: [1.2, 0.6], 
-            onComplete: () => {
-                this.scene.tweens.add({ targets: answerText, alpha: 0, duration: 500, delay: 600, onComplete: () => answerText.destroy() });
-            }
-        });
-    });
-
-    this.scene.time.delayedCall(2000, () => this.transitionToNext());
-}
   
-
     transitionToNext() {
         this.scene.tweens.add({
             targets: this.qaContainer,
@@ -613,6 +610,10 @@ playSuccessAnimation() {
 
     cleanup() {
         super.cleanup();
+        // --- NEW: Stop music on cleanup ---
+        if (this.music && this.music.isPlaying) {
+            this.music.stop();
+        }
         this.createdObjects.forEach(obj => { if (obj && obj.scene) obj.destroy(); });
         this.createdObjects = [];
     }

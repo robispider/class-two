@@ -4,7 +4,7 @@ import { gameState } from '../gameState.js';
 import GameplayController from '../GameplayController.js';
 
 // --- UI Layout Constants ---
-const MAIN_BUTTON_SCALE = 0.25;
+const MAIN_BUTTON_SCALE = 0.4;
 const MENU_BUTTON_SCALE = 0.25;
 const LEVEL_MENU_SPACING = 70;
 const STAGE_MENU_SPACING = 70;
@@ -13,13 +13,14 @@ class StartScreenScene extends Phaser.Scene {
     constructor() {
         super('StartScreenScene');
         
-        // --- Properties to manage UI state ---
         this.selectedButtons = { level: null, stage: null };
         this.activeGlowTweens = { level: null, stage: null };
         this.helpText = null;
         this.defaultHelpText = 'একটি অপশন বাছাই করুন অথবা খেলা শুরু করুন।';
         this.particleEmitter = null;
         this.music = null;
+        this.levelButtons = [];
+        this.stageButtons = [];
     }
 
     create() {
@@ -27,17 +28,26 @@ class StartScreenScene extends Phaser.Scene {
             gameState.controller = new GameplayController();
         }
 
-        // --- Prepare Background Music (but don't play it yet) ---
+        // --- Load last played state from localStorage ---
+        try {
+            const lastPlayed = localStorage.getItem('mathGameLastPlayed');
+            if (lastPlayed) {
+                const { level, stage } = JSON.parse(lastPlayed);
+                gameState.currentLevel = level || 1;
+                gameState.currentStage = stage || 1;
+            }
+        } catch (error) {
+            console.error('Could not load last played state.', error);
+            gameState.currentLevel = 1;
+            gameState.currentStage = 1;
+        }
+
+        // --- Prepare Background Music ---
         this.music = this.sound.add('game-start-menu', { loop: true, volume: 0.4 });
 
-        // --- SOLVES THE AUDIO CONTEXT ERROR ---
         this.input.once('pointerdown', () => {
-            if (this.sound.context.state === 'suspended') {
-                this.sound.resume();
-            }
-            if (this.music && !this.music.isPlaying) {
-                this.music.play();
-            }
+            if (this.sound.context.state === 'suspended') this.sound.resume();
+            if (this.music && !this.music.isPlaying) this.music.play();
         }, this);
 
         const { width, height } = this.cameras.main;
@@ -45,7 +55,7 @@ class StartScreenScene extends Phaser.Scene {
         // --- Background & Title ---
         this.add.rectangle(0, 0, width, height, 0xA3D5E5).setOrigin(0);
         createBackgroundDecorations(this, width, height);
-        this.add.text(width / 2, height * 0.1, 'গুণের অভিযান', {
+        this.add.text(width / 2, height * 0.1, 'নামতা খেলা', {
             fontSize: '64px', fontFamily: '"Noto Sans Bengali", sans-serif', fill: config.colors.text, fontStyle: 'bold', stroke: '#FFF', strokeThickness: 4
         }).setOrigin(0.5);
 
@@ -78,12 +88,17 @@ class StartScreenScene extends Phaser.Scene {
         // --- Initial Selections ---
         const initialLevel = gameState.currentLevel || 1;
         const initialStage = gameState.currentStage || 1;
+        
         this.updateSelectionEffect('level', this.levelButtons[initialLevel - 1], initialLevel, true);
-        this.updateSelectionEffect('stage', this.stageButtons[initialStage - 1], initialStage, true);
+        
+        if (gameState.controller.isStageUnlocked(initialLevel, initialStage)) {
+            this.updateSelectionEffect('stage', this.stageButtons[initialStage - 1], initialStage, true);
+        } else {
+            this.updateSelectionEffect('stage', this.stageButtons[0], 1, true);
+        }
     }
 
     shutdown() {
-        // Fallback to ensure music stops if the scene is shut down by other means.
         if (this.music && this.music.isPlaying) {
             this.music.stop();
         }
@@ -106,12 +121,7 @@ class StartScreenScene extends Phaser.Scene {
             
             const matrix = button.getWorldTransformMatrix();
             this.particleEmitter.setPosition(matrix.tx, matrix.ty);
-            
-            const worldWidth = button.width * button.scaleX;
-            const worldHeight = button.height * button.scaleY;
-
-            const emitZone = new Phaser.Geom.Rectangle(-worldWidth / 2, -worldHeight / 2, worldWidth, worldHeight);
-
+            const emitZone = new Phaser.Geom.Rectangle(-button.width * button.scaleX / 2, -button.height * button.scaleY / 2, button.width * button.scaleX, button.height * button.scaleY);
             this.particleEmitter.setEmitZone({ type: 'edge', source: emitZone, quantity: 1 });
             this.particleEmitter.start();
         });
@@ -127,76 +137,162 @@ class StartScreenScene extends Phaser.Scene {
         const button = this.add.image(x, y, buttonImage).setInteractive({ useHandCursor: true });
         button.setScale(MAIN_BUTTON_SCALE);
         this.add.text(x, y, text, { fontSize: '40px', fontFamily: '"Noto Sans Bengali", sans-serif', fill: '#FFFFFF', fontStyle: 'bold' }).setOrigin(0.5);
-        
         button.on('pointerdown', () => {
             this.sound.play('button-click');
             callback();
         });
-
         this.addHoverEffects(button, helpString);
         return button;
     }
 
-    createMenuButton(x, y, number, helpString, callback) {
-        const button = this.add.image(x, y, 'button-cyan').setInteractive({ useHandCursor: true });
+    createMenuButton(x, y, number, helpString, callback, isLocked = false) {
+        const buttonImage = isLocked ? 'button-gray' : 'button-cyan';
+        const button = this.add.image(x, y, buttonImage).setInteractive({ useHandCursor: !isLocked });
         button.setScale(MENU_BUTTON_SCALE);
         this.add.text(x, y, toBangla(number), { fontSize: '32px', fontFamily: '"Noto Sans Bengali", sans-serif', fill: config.colors.text, fontStyle: 'bold' }).setOrigin(0.5);
         
-        button.on('pointerdown', () => {
-            this.sound.play('button-click');
-            callback(button, number);
-        });
-
-        this.addHoverEffects(button, helpString);
+        if (isLocked) {
+            button.on('pointerover', () => this.helpText.setText("এই লেভেল/স্টেজটি এখনো লক করা আছে।"));
+            button.on('pointerout', () => this.helpText.setText(this.defaultHelpText));
+        } else {
+            button.on('pointerdown', () => {
+                this.sound.play('button-click');
+                callback(button, number);
+            });
+            this.addHoverEffects(button, helpString);
+        }
         return button;
     }
 
+    // MODIFIED: Create each level button individually
     createLevelMenu(x, y) {
-        const startY = y - 80;
-        const level1 = this.createMenuButton(x, startY, 1, 'সহজ প্রশ্ন দিয়ে লেভেল ১ শুরু করুন।', (btn, val) => this.updateSelectionEffect('level', btn, val));
-        const level2 = this.createMenuButton(x, startY + LEVEL_MENU_SPACING, 2, 'মাঝারি প্রশ্ন দিয়ে লেভেল ২ শুরু করুন।', (btn, val) => this.updateSelectionEffect('level', btn, val));
-        const level3 = this.createMenuButton(x, startY + (2 * LEVEL_MENU_SPACING), 3, 'কঠিন প্রশ্ন দিয়ে লেভেল ৩ শুরু করুন।', (btn, val) => this.updateSelectionEffect('level', btn, val));
-        return [level1, level2, level3];
+        const startY = y - 110;
+        const callback = (btn, val) => this.updateSelectionEffect('level', btn, val);
+
+        const level1 = this.createMenuButton(
+            x, startY + (0 * LEVEL_MENU_SPACING), 1,
+            'সহজ প্রশ্ন দিয়ে লেভেল ১ শুরু করুন।', callback,
+            !gameState.controller.isStageUnlocked(1, 1)
+        );
+
+        const level2 = this.createMenuButton(
+            x, startY + (1 * LEVEL_MENU_SPACING), 2,
+            'মাঝারি প্রশ্ন দিয়ে লেভেল ২ শুরু করুন।', callback,
+            !gameState.controller.isStageUnlocked(2, 1)
+        );
+
+        const level3 = this.createMenuButton(
+            x, startY + (2 * LEVEL_MENU_SPACING), 3,
+            'কঠিন প্রশ্ন দিয়ে লেভেল ৩ শুরু করুন।', callback,
+            !gameState.controller.isStageUnlocked(3, 1)
+        );
+        
+        const level4 = this.createMenuButton(
+            x, startY + (3 * LEVEL_MENU_SPACING), 4,
+            'বিশেষজ্ঞ প্রশ্ন দিয়ে লেভেল ৪ শুরু করুন।', callback,
+            !gameState.controller.isStageUnlocked(4, 1)
+        );
+        
+        // You could add custom logic to level2 here, for example:
+        // level2.on('pointerdown', () => console.log("Special action for level 2!"));
+
+        return [level1, level2, level3, level4];
     }
     
+    // MODIFIED: Create each stage button individually
     createStageMenu(x, y) {
         const startY = y - 110;
-        const stage1 = this.createMenuButton(x, startY, 1, 'স্টেজ ১ বাছাই করুন।', (btn, val) => this.updateSelectionEffect('stage', btn, val));
-        const stage2 = this.createMenuButton(x, startY + STAGE_MENU_SPACING, 2, 'স্টেজ ২ বাছাই করুন।', (btn, val) => this.updateSelectionEffect('stage', btn, val));
-        const stage3 = this.createMenuButton(x, startY + (2 * STAGE_MENU_SPACING), 3, 'স্টেজ ৩ বাছাই করুন।', (btn, val) => this.updateSelectionEffect('stage', btn, val));
-        const stage4 = this.createMenuButton(x, startY + (3 * STAGE_MENU_SPACING), 4, 'স্টেজ ৪ বাছাই করুন।', (btn, val) => this.updateSelectionEffect('stage', btn, val));
-        const stage5 = this.createMenuButton(x, startY + (4 * STAGE_MENU_SPACING), 5, 'স্টেজ ৫ বাছাই করুন।', (btn, val) => this.updateSelectionEffect('stage', btn, val));
+        const callback = (btn, val) => this.updateSelectionEffect('stage', btn, val);
+        const currentLevel = gameState.currentLevel;
+
+        const stage1 = this.createMenuButton(
+            x, startY + (0 * STAGE_MENU_SPACING), 1,
+            'স্টেজ ১ বাছাই করুন।', callback,
+            !gameState.controller.isStageUnlocked(currentLevel, 1)
+        );
+
+        const stage2 = this.createMenuButton(
+            x, startY + (1 * STAGE_MENU_SPACING), 2,
+            'স্টেজ ২ বাছাই করুন।', callback,
+            !gameState.controller.isStageUnlocked(currentLevel, 2)
+        );
+
+        const stage3 = this.createMenuButton(
+            x, startY + (2 * STAGE_MENU_SPACING), 3,
+            'স্টেজ ৩ বাছাই করুন।', callback,
+            !gameState.controller.isStageUnlocked(currentLevel, 3)
+        );
+        
+        const stage4 = this.createMenuButton(
+            x, startY + (3 * STAGE_MENU_SPACING), 4,
+            'স্টেজ ৪ বাছাই করুন।', callback,
+            !gameState.controller.isStageUnlocked(currentLevel, 4)
+        );
+        
+        const stage5 = this.createMenuButton(
+            x, startY + (4 * STAGE_MENU_SPACING), 5,
+            'স্টেজ ৫ বাছাই করুন।', callback,
+            !gameState.controller.isStageUnlocked(currentLevel, 5)
+        );
+
         return [stage1, stage2, stage3, stage4, stage5];
     }
 
     updateSelectionEffect(type, newSelectedButton, value, isInitialSetup = false) {
-        if (type === 'level') gameState.currentLevel = value;
-        else if (type === 'stage') gameState.currentStage = value;
+        if (!newSelectedButton) return; // Safety check in case a button doesn't exist
 
+        if (this.selectedButtons[type] === newSelectedButton && !isInitialSetup) return;
+
+        // Clear old selection effect
         const oldSelectedButton = this.selectedButtons[type];
-        if (oldSelectedButton === newSelectedButton) return;
-
         if (oldSelectedButton) {
             if (this.activeGlowTweens[type]) this.activeGlowTweens[type].stop();
             if (oldSelectedButton.postFX) oldSelectedButton.postFX.clear();
-            oldSelectedButton.setTexture('button-cyan');
+            // We need to figure out which number this button represented to check its lock status
+            const oldButtonIndex = (type === 'level' ? this.levelButtons : this.stageButtons).indexOf(oldSelectedButton);
+            if (oldButtonIndex !== -1) {
+                const oldButtonValue = oldButtonIndex + 1;
+                 const isLocked = !gameState.controller.isStageUnlocked(
+                    type === 'level' ? oldButtonValue : gameState.currentLevel,
+                    type === 'stage' ? oldButtonValue : 1
+                );
+                 oldSelectedButton.setTexture(isLocked ? 'button-gray' : 'button-cyan');
+            }
         }
-        
+
+        // Apply new selection effect
         newSelectedButton.setTexture('button-violet');
-        
         const glow = newSelectedButton.postFX.addGlow(0xffffff, 0, 0, false, 0.1, 24);
         this.activeGlowTweens[type] = this.tweens.add({ targets: glow, outerStrength: 4, yoyo: true, loop: -1, ease: 'sine.inout' });
-
+        this.selectedButtons[type] = newSelectedButton;
+        
         if (!isInitialSetup) {
             const shine = newSelectedButton.postFX.addShine(1, 0.2, 5);
             this.time.delayedCall(800, () => { if (shine) newSelectedButton.postFX.remove(shine); });
         }
 
-        this.selectedButtons[type] = newSelectedButton;
+        // --- BUG FIX & REFACTOR: Update stage buttons when level changes ---
+        if (type === 'level') {
+            gameState.currentLevel = value;
+            if (!isInitialSetup) {
+                // Destroy old stage buttons and children, then recreate them
+                this.stageButtons.forEach(button => {
+                    button.list.forEach(child => child.destroy()); // Destroy text on button
+                    button.destroy();
+                });
+                
+                const { width, height } = this.cameras.main;
+                this.stageButtons = this.createStageMenu(width * 0.65, height * 0.6);
+                
+                // Auto-select the first available stage of the new level
+                this.updateSelectionEffect('stage', this.stageButtons[0], 1, true);
+            }
+        } else if (type === 'stage') {
+            gameState.currentStage = value;
+        }
     }
 
     startGame() {
-        // --- FIX: Explicitly stop the music before starting the next scene ---
         if (this.music && this.music.isPlaying) {
             this.music.stop();
         }
@@ -209,7 +305,6 @@ class StartScreenScene extends Phaser.Scene {
     }
 
     startPractice() {
-        // --- FIX: Explicitly stop the music before starting the next scene ---
         if (this.music && this.music.isPlaying) {
             this.music.stop();
         }

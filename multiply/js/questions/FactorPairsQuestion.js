@@ -3,7 +3,7 @@ import { Question } from './Question.js';
 import { config } from '../config.js';
 import { gameState } from '../gameState.js';
 import { toBangla, shuffle, rand } from '../utils.js';
-
+import { ScoreCalculator } from '../ScoreCalculator.js';
 class FactorPairsQuestion extends Question {
     constructor(...args) {
         super(...args);
@@ -25,6 +25,11 @@ class FactorPairsQuestion extends Question {
     }
 
     startQuestionSet() {
+         
+            if (!this.music || !this.music.isPlaying) {
+            this.music = this.scene.sound.add('puzzle-suspense', { loop: true, volume: 0.4 });
+            this.music.play();
+        }
         this.gameState.questionCount = 0;
         this.gameState.correctCount = 0;
         this.gameState.score = 0;
@@ -162,7 +167,19 @@ class FactorPairsQuestion extends Question {
         card.cardBack = cardBack;
         card.frameName = frameName;  // Extra cache per card
 
-        card.on('pointerdown', () => this.handleTileClick(card));
+        card.on('pointerdown', () => {
+            this.scene.sound.play('button-click'); 
+            this.handleTileClick(card);});
+    card.on('pointerover', () => {
+         card.setBlendMode(Phaser.BlendModes.MULTIPLY);
+                     this.scene.sound.play('button-hover', { volume: 0.7 });
+           });
+               card.on('pointerout', () => {
+                    card.setBlendMode(Phaser.BlendModes.NORMAL);
+           });
+            
+            
+  
         this.cards.push(card);
         this.boardContainer.add(card);
     }
@@ -224,7 +241,12 @@ class FactorPairsQuestion extends Question {
         const product = this.selectedCard.numberValue * card.numberValue;
         if (product === gameState.currentTarget) {
             this.scene.stopQuestionTimer();
-            const points = config.points.correct + gameState.streak * config.points.streakBonus;
+            
+            this.scene.sound.play('applause', { volume: 0.6 });
+               const baseScore = 10 + Math.floor(gameState.currentTarget / 5);
+            const streakBonus = gameState.streak * 3;
+            const points = baseScore + streakBonus;
+
             this.handleCorrect(points, "সঠিক!");
             this.animateCorrectPair(this.selectedCard, card);
         } else {
@@ -295,6 +317,7 @@ flipCard(card) {
             this.isProcessing = false;
             gameState.gameActive = true;
         }, [], this);
+          this.scene.sound.play('button-shake');
     }
 
     transitionToNext() {
@@ -308,6 +331,17 @@ flipCard(card) {
         this.scene.stopQuestionTimer();
         if (success) {
             this.callbacks.onCompleteSet("স্টেজ সম্পূর্ণ!", success);
+               const bonus = ScoreCalculator.calculateSetCompletionBonus(
+                this.timeLimit,
+                this.numQuestions,
+                totalTimeTaken
+            );
+            if (bonus > 0) {
+                this.gameState.score += bonus;
+                this.callbacks.onScoreChange(this.gameState.score);
+                // Optional: show bonus feedback
+            }
+
         } else {
             this.callbacks.onCompleteSet("আবার চেষ্টা করুন!", success);
         }

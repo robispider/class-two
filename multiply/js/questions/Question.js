@@ -1,6 +1,7 @@
 // js/questions/Question.js
 import { toBangla, shuffle } from '../utils.js';
 import { config } from '../config.js';
+import { ScoreCalculator } from '../ScoreCalculator.js';
 // import { gameState } from './gameState.js';
 
 class Question    {
@@ -95,8 +96,7 @@ class Question    {
         return shuffle([...options]);
     }
 
-    handleCorrect(points, feedbackText) {
-        //    this.cleanup(); // Stops the timer
+handleCorrect(points, feedbackText) {
         this.gameState.score = Math.max(0, this.gameState.score + points);
         this.gameState.correctCount++;
         this.gameState.streak++;
@@ -105,10 +105,13 @@ class Question    {
         this.callbacks.onUpdateStats();
     }
 
-    handleIncorrect(points, feedbackText) {
-        //    this.cleanup(); // Stops the timer
+
+    handleIncorrect(feedbackText) {
+        // NEW: Get the standard penalty from the ScoreCalculator
+        const points = ScoreCalculator.getIncorrectPenalty();
+
         this.gameState.score = Math.max(0, this.gameState.score + points);
-        this.gameState.streak = 0;
+        this.gameState.streak = 0; // Streak is always reset
         this.callbacks.onIncorrect(points, feedbackText);
         this.callbacks.onScoreChange(this.gameState.score);
         this.callbacks.onUpdateStats();

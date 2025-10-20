@@ -3,6 +3,7 @@ import { Question } from './Question.js';
 import { config } from '../config.js';
 import { gameState } from '../gameState.js';
 import { toBangla, shuffle } from '../utils.js';
+import { ScoreCalculator } from '../ScoreCalculator.js';
 
 class PuzzleQuestion extends Question {
     constructor(...args) {
@@ -21,6 +22,11 @@ class PuzzleQuestion extends Question {
     }
 
     startQuestionSet() {
+            if (!this.music || !this.music.isPlaying) {
+            this.music = this.scene.sound.add('puzzle-suspense', { loop: true, volume: 0.4 });
+            this.music.play();
+        }
+
         this.gameState.questionCount = 0;
         this.gameState.correctCount = 0;
         this.gameState.score = 0;
@@ -197,7 +203,16 @@ class PuzzleQuestion extends Question {
         dropZone.setData('isFilled', true);
         piece.disableInteractive();
         gameState.questionCount++;
-        const points = config.points.correct + gameState.streak * config.points.streakBonus;
+        // NEW: Log the response.
+        const questionData = piece.getData('questionData');
+        this.gameState.performanceTracker.logResponse(questionData.a, questionData.b, 0, true);
+
+        // NEW: Calculate partial score (Base + Streak)
+        const baseScore = 10 + Math.floor(questionData.target / 5);
+        const streakBonus = gameState.streak * 3;
+        const points = baseScore + streakBonus;
+
+
         this.handleCorrect(points, "সঠিক!");
         this.correctlyPlacedPieces++;
         this.scene.updateGameProgress();

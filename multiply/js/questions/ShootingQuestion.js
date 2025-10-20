@@ -3,7 +3,7 @@ import { Question } from './Question.js';
 import { config, planes } from '../config.js';
 import { gameState } from '../gameState.js';
 import { toBangla, shuffle, rand } from '../utils.js';
-
+import { ScoreCalculator } from '../ScoreCalculator.js';
 class ShootingQuestion extends Question {
     constructor(...args) {
         super(...args);
@@ -1139,25 +1139,37 @@ missile.body.ignoreGravity = true;
     processHit(targetSprite, hitX, hitY) {
         if (!targetSprite || targetSprite.hit) return;
         targetSprite.hit = true;
+
+        // const timeTaken = this.scene.stopQuestionTimer();
+       const  timeTaken = this.scene.getQuestionElapsedTime();
+
         const selected = targetSprite.answerValue;
         const correct = selected === this.gameState.currentAnswer;
         const centerX = targetSprite.x;
         const centerY = targetSprite.y;
 
         // Feedback and scoring
-        const points = correct
-            ? config.points.correct + this.gameState.streak * config.points.streakBonus
-            : config.points.incorrect;
+        // const points = correct
+        //     ? config.points.correct + this.gameState.streak * config.points.streakBonus
+        //     : config.points.incorrect;
         const feedbackText = correct ? 'সঠিক!' : 'ভুল!';
+         this.gameState.performanceTracker.logResponse(this.gameState.currentA, this.gameState.currentB, timeTaken, correct);
+
         if (correct) {
             this.hitEmitter.emitParticleAt(centerX, centerY, 30);
+            const points = ScoreCalculator.calculateCorrectScore(
+                this.questionData,
+                timeTaken,
+                this.gameState.performanceTracker
+            );
+
             this.handleCorrect(points, feedbackText);
         } else {
             this.missEmitter.emitParticleAt(centerX, centerY, 15);
-            this.handleIncorrect(points, feedbackText);
-            if (this.gameState.mode === 'practice') {
-                this.gameState.performanceTracker.addProblematic(this.gameState.currentA, this.gameState.currentB);
-            }
+           this.handleIncorrect( feedbackText);
+            // if (this.gameState.mode === 'practice') {
+            //     this.gameState.performanceTracker.addProblematic(this.gameState.currentA, this.gameState.currentB);
+            // }
         }
         this.showFeedbackText(feedbackText, correct ? 'green' : 'red', targetSprite);
 

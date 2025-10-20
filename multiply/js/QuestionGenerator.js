@@ -21,8 +21,10 @@ class QuestionGenerator {
     }
 
     generateAdaptiveQuestion(fixedB = null, stage = 1) {
-        const stats = this.performanceTracker.getStatistics();
-        let problematic = stats.problematicProblems || [];
+        // const stats = this.performanceTracker.getStatistics();
+        // let problematic = stats.problematicProblems || [];
+           let problematic = this.performanceTracker.getProblematicProblems();
+
         let prob = 0.5 + (stage - 1) * 0.1;
         prob = Math.min(0.8, prob);
 

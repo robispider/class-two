@@ -4,7 +4,7 @@ import { Question } from './Question.js';
 import { config } from '../config.js';
 import { gameState } from '../gameState.js';
 import { toBangla, rand, shuffle } from '../utils.js';
-
+import { ScoreCalculator } from '../ScoreCalculator.js';
 /**
  * A standard multiplication question with visual aids.
  * This class is self-contained and creates its own background panel.
@@ -32,7 +32,10 @@ class StandardQuestion extends Question {
             this.scene.startQuestionTimer(this.timeLimit);
         }
 
-
+        if (!this.music || !this.music.isPlaying) {
+            this.music = this.scene.sound.add('practice-music-loop', { loop: true, volume: 0.4 });
+            this.music.play();
+        }
 
         const { a, b } = this.questionData;
         gameState.currentA = a;
@@ -112,8 +115,17 @@ class StandardQuestion extends Question {
             button.answerValue = opt;
             optionsContainer.add(button);
 
-            button.on('pointerdown', () => { if (gameState.gameActive) this.checkAnswer(opt, optionsContainer); });
-            button.on('pointerover', () => this.scene.tweens.add({ targets: button, scale: 1.05, duration: 150, ease: 'Sine.easeInOut' }));
+             button.on('pointerdown', () => {
+                if (gameState.gameActive) {
+                    this.scene.sound.play('button-click'); // Play click sound
+                    this.checkAnswer(opt, optionsContainer);
+                }
+            });
+            button.on('pointerover', () => {
+                this.scene.sound.play('button-hover', { volume: 0.7 }); // Play hover sound
+                this.scene.tweens.add({ targets: button, scale: 1.05, duration: 150, ease: 'Sine.easeInOut' });
+            });
+            
             button.on('pointerout', () => this.scene.tweens.add({ targets: button, scale: 1, duration: 150, ease: 'Sine.easeInOut' }));
         });
 
@@ -182,7 +194,7 @@ class StandardQuestion extends Question {
         if (!gameState.gameActive) return;
         gameState.gameActive = false;
          // Tell the GameScene to stop the timer
-        this.scene.stopQuestionTimer();
+          const timeTaken = this.scene.stopQuestionTimer();
          gameState.questionCount++;
         this.scene.updateGameProgress();
         
@@ -191,14 +203,23 @@ class StandardQuestion extends Question {
         optionsContainer.getAll().forEach(button => button.disableInteractive());
 
         const correct = selected === gameState.currentAnswer;
-        this.gameState.performanceTracker.logResponse(gameState.currentA, gameState.currentB, selected, 0, correct);
+         this.gameState.performanceTracker.logResponse(gameState.currentA, gameState.currentB, timeTaken, correct);
         let feedbackText = correct ? "সঠিক!" : `ভুল! সঠিক উত্তর: ${toBangla(gameState.currentAnswer)}`;
         let points = correct ? config.points.correct + this.gameState.streak * config.points.streakBonus : config.points.incorrect;
 
-        if (correct) {
+           if (correct) {
+            // --- NEW: Play correct answer sound ---
+            this.scene.sound.play('applause', { volume: 0.6 });
+            const points = ScoreCalculator.calculateCorrectScore(
+                this.questionData,
+                timeTaken,
+                this.gameState.performanceTracker
+            );
             this.handleCorrect(points, feedbackText);
             this.playFeedbackAnimation(true, selected, optionsContainer);
         } else {
+            // --- NEW: Play incorrect answer sound ---
+            this.scene.sound.play('button-shake');
             this.handleIncorrect(points, feedbackText);
             this.playFeedbackAnimation(false, selected, optionsContainer);
         }

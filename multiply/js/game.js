@@ -145,23 +145,43 @@ export function startQuestionSet(scene, mode, stage, allowedTables) {
 }
 
 export function endStage(scene, success) {
-    console.log('endStage called, success:', success); // Debug
+    console.log('endStage called, success:', success);
     gameState.gameActive = false;
     if (scene.stopwatch) scene.stopwatch.stop();
+
     const sessionScore = gameState.score;
     gameState.performanceTracker.saveStageHigh(gameState.currentLevel, gameState.currentStage, sessionScore);
-    if (success) {
+
+    // --- NEW: Accuracy Check for Unlocking ---
+    const accuracyPercentage = (gameState.correctCount / gameState.questionCount) * 100;
+    const isUnlocked = accuracyPercentage >= gameState.controller.requiredCorrectPercent;
+
+    if (success && isUnlocked) {
+        // Player passed AND met the accuracy requirement
         gameState.controller.unlockNextStage(gameState.currentLevel, gameState.currentStage);
         showCongratsPane(scene, () => endGame(scene));
     } else {
+        // Player either failed or did not meet the 90% accuracy
         endGame(scene);
     }
 }
 
 export function endGame(scene) {
-    console.log('endGame called'); // Debug
+    console.log('endGame called');
     gameState.gameActive = false;
     if (scene.stopwatch) scene.stopwatch.stop();
     gameState.performanceTracker.saveToLocal();
+
+    // --- NEW: Save the last played level and stage ---
+    try {
+        const lastPlayed = {
+            level: gameState.currentLevel,
+            stage: gameState.currentStage
+        };
+        localStorage.setItem('mathGameLastPlayed', JSON.stringify(lastPlayed));
+    } catch (error) {
+        console.error('Failed to save last played state.', error);
+    }
+
     scene.scene.start('StartScreenScene');
 }

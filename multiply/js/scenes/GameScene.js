@@ -204,12 +204,30 @@ class GameScene extends Phaser.Scene {
         }
     }
 
+    /**
+     * MODIFIED: Stops the per-question timer and returns the time that has elapsed.
+     * This is crucial for calculating the Fluency Bonus.
+     * @returns {number} The elapsed time for the question in seconds, or 0 if no timer exists.
+     */
     stopQuestionTimer() {
         if (this.masterUI) {
-            this.masterUI.stop();
+            // Assumes the Stopwatch class has a method 'stopAndGetElapsedTime'
+            // which stops the timer and returns its elapsed value.
+            return this.masterUI.stopAndGetElapsedTime();
         }
+        return 0;
     }
-
+        /**
+     * NEW METHOD: Gets the elapsed time from the stopwatch without stopping it.
+     * @returns {number} Elapsed time in seconds.
+     */
+    getQuestionElapsedTime() {
+        if (this.masterUI) {
+            return this.masterUI.getElapsedTime();
+        }
+        return 0;
+    }
+    
     updateGameProgress() {
         if (this.masterUI) {
             this.masterUI.updateGameProgress(gameState.questionCount, config.questionsPerSession);

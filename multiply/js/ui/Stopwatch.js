@@ -145,7 +145,36 @@ export class Stopwatch {
             this.capemitter.stop();
         }
     }
+   /**
+     * Stops the timer and returns the time elapsed since it started.
+     * This is essential for calculating time-based scoring bonuses.
+     * @returns {number} The elapsed time in seconds. Returns 0 if no timer was active.
+     */
+    stopAndGetElapsedTime() {
+        if (!this.timerEvent) {
+            return 0; // Return 0 if the timer wasn't running
+        }
 
+        // 1. Get the elapsed time BEFORE destroying the timer event
+        const elapsedSeconds = this.timerEvent.getElapsedSeconds();
+
+        // 2. Use the existing stop() method to perform all cleanup
+        this.stop();
+
+        // 3. Return the captured value
+        return elapsedSeconds;
+    }
+     /**
+     * NEW METHOD: Gets the current elapsed time of the timer *without* stopping it.
+     * Useful for logging events that don't end the question.
+     * @returns {number} The elapsed time in seconds.
+     */
+    getElapsedTime() {
+        if (this.timerEvent) {
+            return this.timerEvent.getElapsedSeconds();
+        }
+        return 0;
+    }
     /**
      * Updates the visual representation of the game progress bar.
      * @param {number} current - The current question number.

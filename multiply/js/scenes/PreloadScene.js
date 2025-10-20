@@ -78,7 +78,13 @@ const { width, height } = this.scale;
 
         this.load.audio("button-click","assets/sounds/button-click.mp3");
         this.load.audio("button-hover","assets/sounds/button-hover.mp3");
+        this.load.audio("button-shake","assets/sounds/button-shake.mp3");
         this.load.audio("game-start-menu","assets/sounds/game-start-menu.mp3");
+        this.load.audio("practice-music-loop","assets/sounds/practice-music-loop.mp3");
+        this.load.audio("puzzle-suspense","assets/sounds/puzzle-suspense.mp3");
+        this.load.audio("standard-gackground","assets/sounds/standard-gackground.mp3");
+            this.load.audio("applause","assets/sounds/applause.mp3");
+
 
 
 
