@@ -2,11 +2,12 @@
 import { createBackgroundDecorations, toBangla } from '../utils.js';
 import { config } from '../config.js';
 import { gameState } from '../gameState.js';
-
+import GameplayController from '../GameplayController.js';
 
 class LevelScreenScene extends Phaser.Scene {
     constructor() {
         super('LevelScreenScene');
+         gameState.controller = new GameplayController();
     }
 
     create(data) {
@@ -20,6 +21,7 @@ class LevelScreenScene extends Phaser.Scene {
         // Title
         this.add.text(this.cameras.main.width / 2, 50, `লেভেল বাছাই করুন`, {
             fontSize: '40px',
+             fontFamily: '"Noto Sans Bengali", sans-serif',
             fill: config.colors.text,
             fontStyle: 'bold'
         }).setOrigin(0.5);
@@ -36,6 +38,7 @@ class LevelScreenScene extends Phaser.Scene {
             const buttonText = this.add.text(this.cameras.main.width / 2, startY + i * buttonSpacing, `লেভেল ${toBangla(levelNum)}`, {
                 fontSize: '30px',
                 fill: config.colors.text,
+                 fontFamily: '"Noto Sans Bengali", sans-serif',
                 fontStyle: 'bold'
             }).setOrigin(0.5);
             button.on('pointerdown', () => {
@@ -51,7 +54,8 @@ class LevelScreenScene extends Phaser.Scene {
             .setOrigin(0.5)
             .setInteractive();
         const practiceText = this.add.text(this.cameras.main.width / 2, startY + maxLevels * buttonSpacing, 'প্র্যাকটিস মোড', {
-            fontSize: '30px',
+            fontSize: '20px',
+             fontFamily: '"Noto Sans Bengali", sans-serif',
             fill: config.colors.text,
             fontStyle: 'bold'
         }).setOrigin(0.5);
@@ -62,17 +66,17 @@ class LevelScreenScene extends Phaser.Scene {
 
 
         // Back Button
-        const backButton = this.add.rectangle(this.cameras.main.width / 2, startY + (maxLevels + 1) * buttonSpacing, 200, 80, Phaser.Display.Color.HexStringToColor(config.colors.stopButton).color)
-            .setOrigin(0.5)
-            .setInteractive();
-        const backText = this.add.text(this.cameras.main.width / 2, startY + (maxLevels + 1) * buttonSpacing, 'পিছনে', {
-            fontSize: '30px',
-            fill: config.colors.text,
-            fontStyle: 'bold'
-        }).setOrigin(0.5);
-        backButton.on('pointerdown', () => {
-            this.scene.start('StartScreenScene');
-        });
+        // const backButton = this.add.rectangle(this.cameras.main.width / 2, startY + (maxLevels + 1) * buttonSpacing, 200, 80, Phaser.Display.Color.HexStringToColor(config.colors.stopButton).color)
+        //     .setOrigin(0.5)
+        //     .setInteractive();
+        // const backText = this.add.text(this.cameras.main.width / 2, startY + (maxLevels + 1) * buttonSpacing, 'পিছনে', {
+        //     fontSize: '30px',
+        //     fill: config.colors.text,
+        //     fontStyle: 'bold'
+        // }).setOrigin(0.5);
+        // backButton.on('pointerdown', () => {
+        //     this.scene.start('StartScreenScene');
+        // });
     }
 }
 

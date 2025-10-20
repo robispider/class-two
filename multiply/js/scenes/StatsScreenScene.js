@@ -60,7 +60,7 @@ class StatsScreenScene extends Phaser.Scene {
             fontStyle: 'bold'
         }).setOrigin(0.5);
         backButton.on('pointerdown', () => {
-            this.scene.start('StartScreenScene');
+            this.scene.start('LevelScreenScene');
         });
     }
 }

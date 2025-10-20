@@ -76,6 +76,13 @@ const { width, height } = this.scale;
         this.load.audio("air-raid-siren","assets/sounds/air-raid-siren.mp3");
         this.load.audio("massive-explosion-3","assets/sounds/massive-explosion-3.mp3");
 
+        this.load.audio("button-click","assets/sounds/button-click.mp3");
+        this.load.audio("button-hover","assets/sounds/button-hover.mp3");
+        this.load.audio("game-start-menu","assets/sounds/game-start-menu.mp3");
+
+
+
+
 
 
 
@@ -117,6 +124,13 @@ const { width, height } = this.scale;
                this.load.image('green-arrow-mid', 'assets/arrow/green-arrow-mid.png');
                this.load.image('green-arrow-point', 'assets/arrow/green-arrow-point.png');
 
+               this.load.image('button-cyan', 'assets/buttons/button-cyan.png');
+               this.load.image('button-gray', 'assets/buttons/button-gray.png');
+               this.load.image('button-red', 'assets/buttons/button-red.png');
+               this.load.image('button-green', 'assets/buttons/button-green.png');
+               this.load.image('button-orange', 'assets/buttons/button-orange.png');
+               this.load.image('button-violet', 'assets/buttons/button-violet.png');
+            
 
 
         this.load.image('farground_cloud_1',"assets/sky_background/parallax_parts/farground_cloud_1.png");
