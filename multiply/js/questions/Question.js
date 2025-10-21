@@ -125,14 +125,14 @@ handleCorrect(points, feedbackText) {
 
     completeSet() {
         this.cleanup();
-        const success = this.gameState.correctCount / this.gameState.questionCount * 100 >= this.gameState.controller.requiredCorrectPercent;
-        const feedback = this.scene.add.text(this.scene.cameras.main.width / 2, this.scene.cameras.main.height / 2, success ? "স্টেজ সম্পূর্ণ!" : "আবার চেষ্টা করুন!", {
-            fontSize: '60px',
-            fill: success ? 'green' : 'red',
-            backgroundColor: 'rgba(0,0,0,0.7)',
-            padding: { left: 20, right: 20, top: 20, bottom: 20 }
-        }).setOrigin(0.5);
-        this.callbacks.onCompleteSet(feedback, success);
+        
+        const success = (this.gameState.correctCount / this.gameState.questionCount) * 100 >= this.gameState.controller.requiredCorrectPercent;
+        
+        // --- FIX: Determine the feedback STRING, don't create a new text object ---
+        const feedbackText = success ? "স্টেজ সম্পূর্ণ!" : "আবার চেষ্টা করুন!";
+
+        // Pass the string to the callback, which will handle displaying it.
+        this.callbacks.onCompleteSet(feedbackText, success);
     }
       update(time, delta) {
         // By default, do nothing.

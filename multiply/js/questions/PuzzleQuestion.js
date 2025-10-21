@@ -301,13 +301,19 @@ class PuzzleQuestion extends Question {
         this.completeSet(false);
     }
 
+// js/questions/PuzzleQuestion.js
+
     completeSet(success = false) {
         if (!gameState.gameActive && !this.isProcessing) return;
         gameState.gameActive = false;
         this.isProcessing = true;
         this.scene.stopQuestionTimer();
         this.draggablePieces.forEach(p => p.disableInteractive());
+
+        // --- FIX: Determine the feedback STRING ---
         const feedbackText = success ? "স্টেজ সম্পূর্ণ!" : "সময় শেষ! আবার চেষ্টা করুন।";
+        
+        // Pass the string to the callback
         this.callbacks.onCompleteSet(feedbackText, success);
     }
 

@@ -1062,6 +1062,9 @@ missile.body.ignoreGravity = true;
         // Set custom properties for our update loop
         missile.ascentTime = 10; // Frames for vertical ascent
         missile.targetPlane = null;
+        missile.prevLOS = null;
+                missile.previousLosAngle = null; // To calculate the rate of change
+        missile.timeToLive = -1; // A countdown to self-destruct if the target is lost
 
 // Set initial rotation and physics body angle to point upward
     missile.setRotation(-Math.PI/2); // Nose up (assuming image nose is up)
@@ -1421,11 +1424,11 @@ shatterPlane(plane) {
 
                 // Set angular velocity to turn the missile.
                 // This creates a smooth turning motion.
-                const turnSpeed = 0.07; // Adjust for how fast the missile turns
+                const turnSpeed = 0.19; // Adjust for how fast the missile turns
                 missile.setAngularVelocity(angleDifference * turnSpeed);
 
                 // Apply thrust in the direction the missile is currently facing
-                const thrustForce = 0.05; // Adjust for missile speed
+                const thrustForce = 0.09; // Adjust for missile speed
                 const force = new Phaser.Math.Vector2();
                 force.x = Math.cos(missile.rotation) * thrustForce;
                 force.y = Math.sin(missile.rotation) * thrustForce;
@@ -1448,6 +1451,7 @@ shatterPlane(plane) {
             }
         });
         
+ 
 
         // --- CONSOLIDATED AND CORRECTED PLANE UPDATE LOOP ---
         if (this.targets)
@@ -1695,6 +1699,17 @@ playQuestionRevealAnimation(textObject) {
             );
         }
     }
+
+   
+    completeSet() {
+        this.cleanup();
+        const success = (this.gameState.correctCount / this.gameState.questionCount) * 100 >= this.gameState.controller.requiredCorrectPercent;
+        
+        const feedbackText = success ? "মিশন সফল!" : "মিশন ব্যর্থ!";
+
+        this.callbacks.onCompleteSet(feedbackText, success);
+    }
+
 
 cleanup() {
      super.cleanup(); 

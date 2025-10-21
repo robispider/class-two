@@ -166,19 +166,27 @@ export function endStage(scene, success) {
     }
 }
 
+
+// js/game.js
+
 export function endGame(scene) {
     console.log('endGame called');
     gameState.gameActive = false;
     if (scene.stopwatch) scene.stopwatch.stop();
     gameState.performanceTracker.saveToLocal();
 
-    // --- NEW: Save the last played level and stage ---
+    // --- ENHANCED: Save the last played level and stage for better UX ---
     try {
-        const lastPlayed = {
-            level: gameState.currentLevel,
-            stage: gameState.currentStage
-        };
-        localStorage.setItem('mathGameLastPlayed', JSON.stringify(lastPlayed));
+        // Load the existing last played data, or create a new object if it doesn't exist
+        const lastPlayedRaw = localStorage.getItem('mathGameLastPlayed');
+        let lastPlayedData = lastPlayedRaw ? JSON.parse(lastPlayedRaw) : { lastActiveLevel: 1, lastStages: {} };
+
+        // Update the data with the session that just ended
+        lastPlayedData.lastActiveLevel = gameState.currentLevel;
+        lastPlayedData.lastStages[gameState.currentLevel] = gameState.currentStage;
+
+        // Save the updated object back to localStorage
+        localStorage.setItem('mathGameLastPlayed', JSON.stringify(lastPlayedData));
     } catch (error) {
         console.error('Failed to save last played state.', error);
     }

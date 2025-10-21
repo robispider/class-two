@@ -324,14 +324,21 @@ flipCard(card) {
         this.scene.time.delayedCall(500, this.displayNextQuestion, [], this);
     }
 
+ // js/questions/FactorPairsQuestion.js
+
     completeSet(success = false) {
         if (!gameState.gameActive && !this.isProcessing) return;
         gameState.gameActive = false;
         this.isProcessing = true;
         this.scene.stopQuestionTimer();
+
+        // --- FIX: Determine the feedback STRING ---
+        const feedbackText = success ? "স্টেজ সম্পূর্ণ!" : "আবার চেষ্টা করুন!";
+
         if (success) {
-            this.callbacks.onCompleteSet("স্টেজ সম্পূর্ণ!", success);
-               const bonus = ScoreCalculator.calculateSetCompletionBonus(
+            // This part is fine, it calculates a bonus score
+            const totalTimeTaken = this.scene.getQuestionElapsedTime(); // Assuming you have this function
+            const bonus = ScoreCalculator.calculateSetCompletionBonus(
                 this.timeLimit,
                 this.numQuestions,
                 totalTimeTaken
@@ -339,12 +346,11 @@ flipCard(card) {
             if (bonus > 0) {
                 this.gameState.score += bonus;
                 this.callbacks.onScoreChange(this.gameState.score);
-                // Optional: show bonus feedback
             }
-
-        } else {
-            this.callbacks.onCompleteSet("আবার চেষ্টা করুন!", success);
         }
+        
+        // Pass the string to the callback
+        this.callbacks.onCompleteSet(feedbackText, success);
     }
     
     isQuestionSolvable(question, availableTiles) {
