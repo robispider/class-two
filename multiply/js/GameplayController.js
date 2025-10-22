@@ -12,18 +12,27 @@ class GameplayController {
         ];
         this.stagesPerLevel = 5;
         this.requiredCorrectPercent = 90; // MODIFIED: Set to 90% as requested
-        
-        // MODIFIED: This will hold the highest stage unlocked for each level.
-        // e.g., { 1: 3, 2: 1 } means Level 1 is unlocked up to Stage 3, and Level 2 up to Stage 1.
         this.unlockedStages = {};
-        this.loadProgress(); // NEW: Load progress when the game starts.
+        this.userName = null; // NEW: To store the current user's name
     }
 
     // --- NEW: Methods for Saving and Loading Progress ---
+    
+    _getUserKey(base) {
+        if (!this.userName) return null;
+        return `mathGame_${this.userName}_${base}`;
+    }
 
-    loadProgress() {
+    loadProgress(userName) {
+        this.userName = userName;
+        const key = this._getUserKey('progress');
+        if (!key) {
+            this.unlockedStages = { '1': 1 };
+            return;
+        }
+        
         try {
-            const savedProgress = localStorage.getItem('mathGameProgress');
+            const savedProgress = localStorage.getItem(key);
             if (savedProgress) {
                 this.unlockedStages = JSON.parse(savedProgress);
             } else {
@@ -31,16 +40,19 @@ class GameplayController {
                 this.unlockedStages = { '1': 1 };
             }
         } catch (error) {
-            console.error('Failed to load progress, resetting.', error);
+            console.error(`Failed to load progress for ${this.userName}, resetting.`, error);
             this.unlockedStages = { '1': 1 };
         }
     }
 
     saveProgress() {
+        const key = this._getUserKey('progress');
+        if (!key) return;
+
         try {
-            localStorage.setItem('mathGameProgress', JSON.stringify(this.unlockedStages));
+            localStorage.setItem(key, JSON.stringify(this.unlockedStages));
         } catch (error) {
-            console.error('Failed to save progress.', error);
+            console.error(`Failed to save progress for ${this.userName}.`, error);
         }
     }
 

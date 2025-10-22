@@ -1,5 +1,5 @@
 // js/scenes/PreloadScene.js
-import { planes } from '../config.js';
+import { planes,avatars } from '../config.js';
 class PreloadScene extends Phaser.Scene {
     constructor() {
         super('PreloadScene');
@@ -66,6 +66,21 @@ const { width, height } = this.scale;
             }
         });
                 
+    avatars.forEach(avatarFile => {
+            // Create a unique key like 'avatar-boy.png'
+            const key = `avatar-${avatarFile}`;
+            this.load.image(key, `assets/avatar/${avatarFile}`);
+        });
+        
+        // --- NEW: Load Icon for Change User Button ---
+        this.load.image('switch-icon', 'assets/icons/user-icon.png'); // You'll need to add a small switch/change icon image
+        this.load.image('selection-round', 'assets/icons/round-selection.png');
+        
+        // In case you don't have them yet for the leaderboard
+        this.load.image('medal-gold', 'assets/icons/medal_gold.png');
+        this.load.image('medal-silver', 'assets/icons/medal_silver.png');
+        this.load.image('medal-bronze', 'assets/icons/medal_bronze.png');
+        this.load.image('star-icon', 'assets/icons/star.png');
 
 
 //sound fx 

@@ -87,8 +87,8 @@ export class UserSelectionComponent {
             .fillStyle(0xffffff, 0.4)
             .fillRoundedRect(-size / 2, -size / 2, size, size, 20);
 
-        const avatarImg = this.scene.add.image(0, -20, `avatar-${user.avatar}`).setScale(0.5); // Large, clear avatar
-        const nameText = this.scene.add.text(0, size / 2 - 25, user.name, { fontSize: '32px', fill: config.colors.text, fontStyle: 'bold', align: 'center' }).setOrigin(0.5);
+        const avatarImg = this.scene.add.image(0, -20, `avatar-${user.avatar}`).setScale(1); // Large, clear avatar
+        const nameText = this.scene.add.text(0, size / 2 - 25, user.name, { fontSize: '32px', fontFamily: '"Noto Sans Bengali", sans-serif', fill: config.colors.text, fontStyle: 'bold', align: 'center' }).setOrigin(0.5);
         
         container.add([bg, avatarImg, nameText]);
         container.on('pointerdown', () => this.selectUserAndClose(user.name));
@@ -105,7 +105,7 @@ export class UserSelectionComponent {
             .fillRoundedRect(-size / 2, -size / 2, size, size, 20);
             
         const plusSign = this.scene.add.text(0, -20, '+', { fontSize: '120px', fill: '#FFFFFF' }).setOrigin(0.5);
-        const addText = this.scene.add.text(0, size / 2 - 25, 'নতুন প্রোফাইল', { fontSize: '24px', fill: '#FFFFFF', fontStyle: 'bold' }).setOrigin(0.5);
+        const addText = this.scene.add.text(0, size / 2 - 25, 'নতুন প্রোফাইল', { fontSize: '24px',fontFamily: '"Noto Sans Bengali", sans-serif',  fill: '#FFFFFF', fontStyle: 'bold' }).setOrigin(0.5);
         
         container.add([bg, plusSign, addText]);
         container.on('pointerdown', () => this.showCreateUserScreen());
@@ -127,17 +127,17 @@ export class UserSelectionComponent {
         this.contentContainer.add(title);
         nextY += 80;
         
-        const avatarTitle = this.scene.add.text(0, nextY, 'একটি ছবি বাছাই করুন', { fontSize: '28px', fill: config.colors.text }).setOrigin(0.5);
+        const avatarTitle = this.scene.add.text(0, nextY, 'একটি ছবি বাছাই করুন', { fontSize: '28px',fontFamily: '"Noto Sans Bengali", sans-serif',  fill: config.colors.text }).setOrigin(0.5);
         this.contentContainer.add(avatarTitle);
         nextY += 120;
         
-        this.avatarSelectionIndicator = this.scene.add.image(0, 0, 'selection-frame').setScale(0.55).setVisible(false);
+        this.avatarSelectionIndicator = this.scene.add.image(0, 0, 'selection-round').setScale(.2).setVisible(false);
         this.scene.tweens.add({ targets: this.avatarSelectionIndicator, angle: 360, loop: -1, duration: 5000 });
         this.contentContainer.add(this.avatarSelectionIndicator);
 
         avatars.forEach((avatarFile, index) => {
             const xPos = (index - (avatars.length - 1) / 2) * 140;
-            const avatarImg = this.scene.add.image(xPos, nextY, `avatar-${avatarFile}`).setScale(0.4).setInteractive({ useHandCursor: true });
+            const avatarImg = this.scene.add.image(xPos, nextY, `avatar-${avatarFile}`).setScale(1).setInteractive({ useHandCursor: true });
             
             avatarImg.on('pointerdown', () => {
                 this.selectedAvatarFile = avatarFile;

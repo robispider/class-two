@@ -1,4 +1,13 @@
 // js/config.js
+export const avatars = [
+    'alana.png',
+'azmina.png',
+'hakim.png',
+'natasha.png',
+'roman.png',
+'serina.png',
+];
+
 export const uiColors = {
     bgGradient: ["#A3D5E5", "#7A9AC9"],
     panel: "#FDF0D5",

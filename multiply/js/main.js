@@ -20,6 +20,10 @@ const phaserConfig = {
     width: 1024,
     height: 768,
     backgroundColor: '#333333',
+     parent: 'game-container', // Tell Phaser where to render the game
+    dom: {
+        createContainer: true  // Enable DOM element support
+    },
     scene: [
         BootScene,
         PreloadScene,

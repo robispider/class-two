@@ -9,62 +9,67 @@
 class PerformanceTracker {
     constructor() {
         this.data = {
-            stageHigh: {},
-            levelHigh: {},
+            // REMOVED: stageHigh and levelHigh are no longer tracked here.
             overallHigh: 0,
-            // Uses a Set for efficient add/delete/has checks, preventing duplicates.
             problematicProblems: new Set(),
             statistics: {},
         };
-        this.responses = []; // For session-specific detailed logging, if needed.
-
-        this.loadFromLocal();
+        this.responses = [];
+        this.userName = null;
+    }
+    
+    _getUserKey() {
+        if (!this.userName) return null;
+        return `mathGame_${this.userName}_performance`;
     }
 
-    /**
-     * Loads player data from localStorage.
-     * Includes error handling to prevent game crashes from corrupted data.
-     */
-    loadFromLocal() {
+    loadFromLocal(userName) {
+        this.userName = userName;
+        const key = this._getUserKey();
+        if (!key) return;
+
         try {
-            const saved = localStorage.getItem('mathGameData');
+            const saved = localStorage.getItem(key);
             if (saved) {
                 const parsedData = JSON.parse(saved);
-                this.data = {
-                    ...this.data, // Keep defaults
-                    ...parsedData, // Overwrite with saved data
-                    // Ensure problematicProblems is always a Set, converting from array if needed.
-                    problematicProblems: new Set(parsedData.problematicProblems || [])
-                };
+                // Only load relevant data
+                this.data.overallHigh = parsedData.overallHigh || 0;
+                this.data.problematicProblems = new Set(parsedData.problematicProblems || []);
+            } else {
+                // Fresh start for a new user's data
+                this.data = { overallHigh: 0, problematicProblems: new Set(), statistics: {} };
             }
         } catch (error) {
-            console.error("Failed to load or parse performance data. Starting fresh.", error);
-            // In case of corruption, we start with a fresh data object.
-            localStorage.removeItem('mathGameData');
+            console.error(`Failed to load or parse performance data for ${this.userName}. Starting fresh.`, error);
+            this.data = { overallHigh: 0, problematicProblems: new Set(), statistics: {} };
+            localStorage.removeItem(key);
         }
     }
 
-    /**
-     * Saves the current performance data to localStorage.
-     * Converts the Set to an Array for JSON compatibility.
-     */
     saveToLocal() {
+        const key = this._getUserKey();
+        if (!key) return;
+
         try {
-            // Convert Set to Array for JSON serialization
             const dataToSave = {
-                ...this.data,
+                overallHigh: this.data.overallHigh,
                 problematicProblems: Array.from(this.data.problematicProblems)
             };
-            localStorage.setItem('mathGameData', JSON.stringify(dataToSave));
+            localStorage.setItem(key, JSON.stringify(dataToSave));
         } catch (error) {
-            console.error("Failed to save performance data.", error);
+            console.error(`Failed to save performance data for ${this.userName}.`, error);
+        }
+    }
+    
+    // REMOVED: saveStageHigh and saveLevelHigh methods are gone.
+
+    saveOverallHigh(score) {
+        if (score > this.data.overallHigh) {
+            this.data.overallHigh = score;
         }
     }
 
-    /**
-     * Logs a single question response. If the answer is incorrect,
-     * it's automatically added to the problematic set.
-     */
+    // ... (logResponse, isProblematic, addProblematic, resolveProblematic, getProblematicProblems remain the same) ...
     logResponse(a, b, timeTaken, isCorrect) {
         this.responses.push({ a, b, timeTaken, isCorrect, timestamp: Date.now() });
 
@@ -72,70 +77,24 @@ class PerformanceTracker {
             this.addProblematic(a, b);
         }
     }
-
-    /**
-     * Checks if a specific problem is currently marked as problematic.
-     * @returns {boolean} True if the problem is on the list.
-     */
     isProblematic(a, b) {
         const key = `${a}x${b}`;
         return this.data.problematicProblems.has(key);
     }
-
-    /**
-     * Adds a problem to the problematic list.
-     * The use of a Set automatically handles duplicates.
-     */
     addProblematic(a, b) {
         const key = `${a}x${b}`;
         this.data.problematicProblems.add(key);
-        console.log(`Added to problematic: ${key}. Current list:`, this.data.problematicProblems);
     }
-
-    /**
-     * Removes a problem from the problematic list, typically after a correct answer.
-     * This signifies that the user has "mastered" it.
-     */
     resolveProblematic(a, b) {
         const key = `${a}x${b}`;
         if (this.data.problematicProblems.has(key)) {
             this.data.problematicProblems.delete(key);
-            console.log(`Resolved problematic problem: ${key}`);
-            return true; // Indicate that a mastery bonus should be awarded
+            return true;
         }
         return false;
     }
-    
-  /**
-     * NEW METHOD: Returns the current list of problematic problems as an array.
-     * This provides a clean interface for other parts of the game, like the
-     * QuestionGenerator, to access this specific data.
-     * @returns {string[]} An array of problem keys (e.g., ["7x6", "9x8"]).
-     */
     getProblematicProblems() {
-        // Convert the Set to an Array for consumers that need to iterate or pick randomly.
         return Array.from(this.data.problematicProblems);
-    }
-
-    // --- High Score Methods ---
-
-    saveStageHigh(level, stage, score) {
-        const key = `${level}-${stage}`;
-        if (!this.data.stageHigh[key] || score > this.data.stageHigh[key]) {
-            this.data.stageHigh[key] = score;
-        }
-    }
-
-    saveLevelHigh(level, score) {
-        if (!this.data.levelHigh[level] || score > this.data.levelHigh[level]) {
-            this.data.levelHigh[level] = score;
-        }
-    }
-
-    saveOverallHigh(score) {
-        if (score > this.data.overallHigh) {
-            this.data.overallHigh = score;
-        }
     }
 }
 

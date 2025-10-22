@@ -1,4 +1,5 @@
 // js/gameState.js
+import { userManager } from './UserManager.js'; // Import the user manager
 export const gameState = {
     gameActive: false,
     currentLevel: 1,
@@ -24,4 +25,6 @@ export const gameState = {
     currentQuestion: null,
     questionData: null,
     // UI elements will be managed in scenes
+     userManager: userManager,
+    currentUser: userManager.getCurrentUser(), // Set the current user on startup
 };

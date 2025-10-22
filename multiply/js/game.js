@@ -11,6 +11,7 @@ import { FactorPairsQuestion } from './questions/FactorPairsQuestion.js';
 import { PuzzleQuestion } from './questions/PuzzleQuestion.js';
 import { CascadeQuestion } from './questions/CascadeQuestion.js';
 import { ShootingQuestion } from './questions/ShootingQuestion.js';
+import { leaderboardManager } from './LeaderboardManager.js';
 
 export function startStage(scene, mode, level, allowedTables = [1, 2, 3, 4, 5]) {
     console.log('startStage called with scene:', scene, 'mode:', mode, 'level:', level, 'stage:', gameState.currentStage, 'allowedTables:', allowedTables); // Debug
@@ -150,8 +151,16 @@ export function endStage(scene, success) {
     if (scene.stopwatch) scene.stopwatch.stop();
 
     const sessionScore = gameState.score;
-    gameState.performanceTracker.saveStageHigh(gameState.currentLevel, gameState.currentStage, sessionScore);
+       leaderboardManager.addScore(
+        gameState.currentUser,
+        gameState.currentLevel,
+        gameState.currentStage,
+        sessionScore
+    );
+    
 
+    // gameState.performanceTracker.saveStageHigh(gameState.currentLevel, gameState.currentStage, sessionScore);
+    gameState.performanceTracker.saveOverallHigh(sessionScore);
     // --- NEW: Accuracy Check for Unlocking ---
     const accuracyPercentage = (gameState.correctCount / gameState.questionCount) * 100;
     const isUnlocked = accuracyPercentage >= gameState.controller.requiredCorrectPercent;
@@ -175,10 +184,11 @@ export function endGame(scene) {
     if (scene.stopwatch) scene.stopwatch.stop();
     gameState.performanceTracker.saveToLocal();
 
-    // --- ENHANCED: Save the last played level and stage for better UX ---
+    // --- ENHANCED: Save the last played level and stage for the current user ---
+    const key = `mathGame_${gameState.currentUser}_lastPlayed`;
     try {
         // Load the existing last played data, or create a new object if it doesn't exist
-        const lastPlayedRaw = localStorage.getItem('mathGameLastPlayed');
+        const lastPlayedRaw = localStorage.getItem(key);
         let lastPlayedData = lastPlayedRaw ? JSON.parse(lastPlayedRaw) : { lastActiveLevel: 1, lastStages: {} };
 
         // Update the data with the session that just ended
@@ -186,7 +196,7 @@ export function endGame(scene) {
         lastPlayedData.lastStages[gameState.currentLevel] = gameState.currentStage;
 
         // Save the updated object back to localStorage
-        localStorage.setItem('mathGameLastPlayed', JSON.stringify(lastPlayedData));
+        localStorage.setItem(key, JSON.stringify(lastPlayedData));
     } catch (error) {
         console.error('Failed to save last played state.', error);
     }
