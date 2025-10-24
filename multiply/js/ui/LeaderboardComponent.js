@@ -5,6 +5,23 @@ import { config } from '../config.js';
 import { leaderboardManager } from '../LeaderboardManager.js';
 import { gameState } from '../gameState.js';
 
+/**
+ * Formats seconds into a MM:SS string.
+ * @param {number} seconds - The total seconds.
+ * @returns {string} The formatted time string.
+ */
+function formatTime(seconds) {
+    if (isNaN(seconds) || seconds < 0) {
+        return toBangla('০০:০০');
+    }
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    const paddedMins = String(mins).padStart(2, '0');
+    const paddedSecs = String(secs).padStart(2, '0');
+    return `${toBangla(paddedMins)}:${toBangla(paddedSecs)}`;
+}
+
+
 export class LeaderboardComponent {
 
     constructor(scene) {
@@ -54,14 +71,16 @@ export class LeaderboardComponent {
 
         // --- *** THE FIX IS HERE *** ---
         // First, create the header text objects.
-        const rankHeader = this.scene.add.text(width / 2 - 320, headerY, 'ক্রম', headerStyle).setOrigin(0.5, 0.5);
-        const nameHeader = this.scene.add.text(width / 2 - 170, headerY, 'খেলোয়াড়', headerStyle).setOrigin(0.5, 0.5);
-        const scoreHeader = this.scene.add.text(width / 2 + 30, headerY, 'স্কোর', headerStyle).setOrigin(0.5, 0.5);
-        const dateHeader = this.scene.add.text(width / 2 + 150, headerY, 'তারিখ', headerStyle).setOrigin(0.5, 0.5);
-        const timeHeader = this.scene.add.text(width / 2 + 270, headerY, 'সময়', headerStyle).setOrigin(0.5, 0.5);
-        
+        const rankHeader = this.scene.add.text(width / 2 - 280, headerY, 'ক্রম', headerStyle).setOrigin(0.5, 0.5);
+        const nameHeader = this.scene.add.text(width / 2 - 200, headerY, 'খেলোয়াড়', headerStyle).setOrigin(0.5, 0.5);
+        const scoreHeader = this.scene.add.text(width / 2 , headerY, 'স্কোর', headerStyle).setOrigin(0.5, 0.5);
+      
+        // const timeHeader = this.scene.add.text(width / 2 + 270, headerY, 'সময়', headerStyle).setOrigin(0.5, 0.5);
+        const timeHeader = this.scene.add.text(width / 2 + 90 , headerY, 'সময়কাল', headerStyle).setOrigin(0.5, 0.5);
+          const dateHeader = this.scene.add.text(width /2 + 230, headerY, 'তারিখ ও সময়', headerStyle).setOrigin(0.5, 0.5);
+
         // Second, add all of them to the modalGroup so they get managed correctly.
-        this.modalGroup.addMultiple([rankHeader, nameHeader, scoreHeader, dateHeader, timeHeader]);
+        this.modalGroup.addMultiple([rankHeader, nameHeader, scoreHeader,  timeHeader,dateHeader]);
         // --- *** END OF FIX *** ---
 
         const startY = headerY + 50;
@@ -84,6 +103,7 @@ export class LeaderboardComponent {
                     bgColor = 0x5a2d75;
                 }
                 const rowBg = this.scene.add.rectangle(width / 2, yPos, modalWidth - 50, 44, bgColor, 0.1).setOrigin(0.5);
+                 const rankObjects = [];
 
                 let rankIcon;
                 if (index === 0) {
@@ -93,24 +113,45 @@ export class LeaderboardComponent {
                 } else if (index === 2) {
                     rankIcon = this.scene.add.image(width / 2 - 320, yPos, 'medal-bronze').setScale(0.5);
                 } else {
-                    rankIcon = this.scene.add.image(width / 2 - 320, yPos, 'star-icon').setScale(0.5);
-                    this.scene.add.text(rankIcon.x, yPos, toBangla(index + 1), { fontSize: '18px', fill: '#5C2626', fontStyle: 'bold' }).setOrigin(0.5);
-                }
-                
-                const entryStyle = { fontSize: '22px', fontFamily: '"Noto Sans Bengali", sans-serif', fill: config.colors.text };
-                
-                const nameText = this.scene.add.text(width / 2 - 280, yPos, entry.user.name, entryStyle).setOrigin(0, 0.5);
-                const scoreText = this.scene.add.text(width / 2 + 60, yPos, toBangla(entry.score), { ...entryStyle, fontStyle: 'bold' }).setOrigin(1, 0.5);
+                    // rankIcon = this.scene.add.image(width / 2 - 320, yPos, 'star-icon').setScale(0.5);
+                    // this.scene.add.text(rankIcon.x, yPos, toBangla(index + 1), { fontSize: '18px', fill: '#5C2626', fontStyle: 'bold' }).setOrigin(0.5);
+                     rankIcon = this.scene.add.image(width / 2 - 320, yPos, 'star-cyan')
+                        .setScale(0.5);
+                        // .setTint(0xCCCCCC); // Apply a light gray (steel) tint
 
-                const date = new Date(entry.date);
+                   
+                }
+                      const rankText = this.scene.add.text(rankIcon.x+40, yPos, toBangla(index + 1), { fontSize: '18px', fill: '#5C2626', fontStyle: 'bold' }).setOrigin(0.5);
+                    
+                    // Add BOTH objects to the temporary array
+                    rankObjects.push(rankIcon, rankText);
+
+               
+                 const entryStyle = { fontSize: '22px', fontFamily: '"Noto Sans Bengali", sans-serif', fill: config.colors.text };
+                
+                const nameText = this.scene.add.text(width / 2 - 240, yPos, entry.user.name, entryStyle).setOrigin(0, 0.5);
+                const scoreText = this.scene.add.text(width / 2 + 30, yPos, toBangla(entry.score), { ...entryStyle, fontStyle: 'bold' }).setOrigin(1, 0.5);
+
+                   const date = new Date(entry.date);
                 const formattedDate = date.toLocaleDateString('bn-BD', { day: '2-digit', month: '2-digit', year: 'numeric' });
                 const timeString = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-                const formattedTime = timeString.replace('PM', 'পিএম').replace('AM', 'এএম');
-
-                const dateText = this.scene.add.text(width / 2 + 200, yPos, toBangla(formattedDate), { ...entryStyle, fontSize: '20px' }).setOrigin(1, 0.5);
-                const timeText = this.scene.add.text(width / 2 + 330, yPos, toBangla(formattedTime), { ...entryStyle, fontSize: '20px' }).setOrigin(1, 0.5);
+                const formattedTimeOfDay = timeString.replace('PM', 'পিএম').replace('AM', 'এএম');
+                const fullDateTimeString = `${toBangla(formattedDate)}  ${toBangla(formattedTimeOfDay)}`;
+                // const formattedTime = timeString.replace('PM', 'পিএম').replace('AM', 'এএম');
+                 let        formattedTimeTaken="-";
+console.log(entry.timeTaken);
+                if (entry.timeTaken!=undefined && entry.timeTaken>0)
+                {
+                       
+                    formattedTimeTaken = `${formatTime(entry.timeTaken)}`;
+                }
+ 
+                // const dateText = this.scene.add.text(width / 2 + 200, yPos, toBangla(formattedDate), { ...entryStyle, fontSize: '20px' }).setOrigin(1, 0.5);
+                // const timeText = this.scene.add.text(width / 2 + 330, yPos, toBangla(formattedTime), { ...entryStyle, fontSize: '20px' }).setOrigin(1, 0.5);
+                       const durationText = this.scene.add.text(width / 2 + 90, yPos, formattedTimeTaken, { ...entryStyle, fontSize: '20px' }).setOrigin(1, 0.5);
+                const dateTimeText = this.scene.add.text(width / 2 + 320, yPos, fullDateTimeString, { ...entryStyle, fontSize: '14px' }).setOrigin(1, 0.5);
                 
-                const rowContainer = this.scene.add.container(0, 0, [rowBg, rankIcon, nameText, scoreText, dateText, timeText]);
+                const rowContainer = this.scene.add.container(0, 0, [rowBg, ...rankObjects, nameText, scoreText, durationText, dateTimeText]);
                 rowContainer.setAlpha(0).setX(-width);
                 
                 this.scene.tweens.add({

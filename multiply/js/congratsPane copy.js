@@ -15,12 +15,11 @@ function createButton(scene, x, y, text, buttonKey, onClick) {
     const buttonContainer = scene.add.container(x, y);
 
     const buttonImage = scene.add.image(0, 0, buttonKey)
-        // --- MODIFIED: Set x and y scale separately to make the button wider ---
-        .setScale(0.35, 0.25) 
+        .setScale(0.35)
         .setInteractive({ useHandCursor: true });
 
     const buttonText = scene.add.text(0, 0, text, {
-        fontSize: '26px', // User's requested font size
+        fontSize: '32px',
         fontFamily: '"Noto Sans Bengali", sans-serif',
         fill: '#FFFFFF',
         fontStyle: 'bold',
@@ -98,61 +97,32 @@ export function showCongratsPane(scene, callback) {
     }).setOrigin(0.5);
     pane.add(sessionScoreLabel);
 
-    const leaderboardTitle = scene.add.text(0, -PANE_HEIGHT / 2 + 180, `--- লেভেল ${toBangla(gameState.currentLevel)} - স্টেজ ${toBangla(gameState.currentStage)} (সেরা স্কোর) ---`, {
+    const leaderboardTitle = scene.add.text(0, -PANE_HEIGHT / 2 + 180, `--- লেভেল ${toBangla(gameState.currentLevel)} - স্টেজ ${toBangla(gameState.currentStage)} (সেরা ৫) ---`, {
         fontSize: '24px', fontFamily: '"Noto Sans Bengali", sans-serif', fill: config.colors.text,
     }).setOrigin(0.5);
     pane.add(leaderboardTitle);
 
-    // --- NEW: Display Top 3 and Current Player's Performance ---
-    const allScores = leaderboardManager.getScores(gameState.currentLevel, gameState.currentStage);
+    // --- USE THE MANAGER to get scores for the CURRENT stage ---
+    const topScores = leaderboardManager.getScores(gameState.currentLevel, gameState.currentStage);
     const leaderboardStartY = -PANE_HEIGHT / 2 + 225;
 
-    if (allScores.length === 0) {
+    if (topScores.length === 0) {
         const noData = scene.add.text(0, leaderboardStartY + 50, "এখনো কোনো স্কোর নেই!", { fontSize: '22px', fill: config.colors.text}).setOrigin(0.5);
         pane.add(noData);
     } else {
-        const currentUser = gameState.currentUser;
-        const userRankIndex = allScores.findIndex(entry => entry.user.name === currentUser.name);
-
-        const topEntries = allScores.slice(0, 3);
-        let displayEntries = [...topEntries];
-
-        // If the user is not in the top 3 and exists in the list, add them for context.
-        if (userRankIndex > 2) {
-            displayEntries.push({ isSeparator: true });
-            // Add the user's entry with their actual rank number
-            displayEntries.push({ ...allScores[userRankIndex], rank: userRankIndex + 1 });
-        }
-
-        let yOffset = 0;
-        displayEntries.forEach((entry, index) => {
-            if (entry.isSeparator) {
-                const separator = scene.add.text(0, leaderboardStartY + yOffset, '...', { fontSize: '24px', fill: config.colors.text }).setOrigin(0.5);
-                pane.add(separator);
-                yOffset += 35;
-                return;
-            }
-
-            const rank = entry.rank || index + 1; // Use stored rank if available, otherwise use index
-            const yPos = leaderboardStartY + yOffset;
-            const isCurrentUser = entry.user.name === currentUser.name;
-
-            // Highlight the current user's score
-            const textStyle = { fontSize: '24px', fontFamily: '"Noto Sans Bengali", sans-serif', fill: isCurrentUser ? '#FFD700' : config.colors.text };
-            const scoreStyle = { ...textStyle, fontStyle: 'bold' };
-
-            const rankText = scene.add.text(-250, yPos, `${toBangla(rank)}. ${entry.user.name}`, textStyle).setOrigin(0, 0.5);
-            const scoreText = scene.add.text(250, yPos, toBangla(entry.score), scoreStyle).setOrigin(1, 0.5);
+        topScores.slice(0, 5).forEach((entry, index) => {
+            const yPos = leaderboardStartY + index * 35;
+            const rankText = scene.add.text(-250, yPos, `${toBangla(index + 1)}. ${entry.user}`, { fontSize: '24px', fontFamily: '"Noto Sans Bengali", sans-serif', fill: config.colors.text }).setOrigin(0, 0.5);
+            const scoreText = scene.add.text(250, yPos, toBangla(entry.score), { fontSize: '24px', fontFamily: '"Noto Sans Bengali", sans-serif', fill: config.colors.text, fontStyle: 'bold' }).setOrigin(1, 0.5);
             pane.add([rankText, scoreText]);
-            yOffset += 35;
         });
     }
     
     // Adjust button positions for the new button
     const buttonY = PANE_HEIGHT / 2 - 250;
     
-    // --- REUSE: The button now opens the full LeaderboardComponent ---
-    const leaderboardButton = createButton(scene, 0, buttonY, "পূর্ণ লিডারবোর্ড দেখুন", 'button-cyan', () => {
+    // --- NEW "View Full Leaderboard" Button ---
+    const leaderboardButton = createButton(scene, 0, buttonY, "পূর্ণ লিডারবোর্ড দেখুন", 'button-blue', () => {
         const lbComponent = new LeaderboardComponent(scene);
         lbComponent.show({
             level: gameState.currentLevel,
@@ -162,9 +132,7 @@ export function showCongratsPane(scene, callback) {
     
     const advanceButton = createButton(scene, 0, buttonY + 70, "পরবর্তী স্টেজ", 'button-green', () => {
         let nextStage = gameState.currentStage + 1;
-
         let nextLevel = gameState.currentLevel;
-        
         const stagesPerLevel = gameState.controller.stagesPerLevel;
 
         if (nextStage > stagesPerLevel) {

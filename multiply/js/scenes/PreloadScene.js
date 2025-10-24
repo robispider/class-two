@@ -81,6 +81,7 @@ const { width, height } = this.scale;
         this.load.image('medal-silver', 'assets/icons/medal_silver.png');
         this.load.image('medal-bronze', 'assets/icons/medal_bronze.png');
         this.load.image('star-icon', 'assets/icons/star.png');
+          this.load.image('star-cyan', 'assets/icons/star-cyan.png');
 
 
 //sound fx 

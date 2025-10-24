@@ -24,6 +24,7 @@ class Question    {
         this.questionData = null;
         this.questionGenerator = gameState.questionGenerator;
         this.maxMultiplyNumber = 10;
+          this.hasBeenAnsweredCorrectly = false; // --- ADD THIS LINE ---
     }
 
     startQuestionSet() {
@@ -59,9 +60,11 @@ class Question    {
             return;
         }
         this.cleanup();
+        
         this.questionData = this.generateQuestionData();
         this.setup();
         this.currentQuestionIndex++;
+        this.hasBeenAnsweredCorrectly = false; // --- ADD THIS LINE to reset for the new question ---
     }
 
      handleTimeUp() {
@@ -97,8 +100,17 @@ class Question    {
     }
 
 handleCorrect(points, feedbackText) {
+        const streakBonus = this.gameState.streak * config.points.streakBonus; // Or get from config
+        this.gameState.totalBonus += streakBonus;
+
         this.gameState.score = Math.max(0, this.gameState.score + points);
-        this.gameState.correctCount++;
+         // Only increment the main "correct question" counter ONCE per question/round.
+         console.log(this.hasBeenAnsweredCorrectly, this.gameState.correctCount);
+        if (!this.hasBeenAnsweredCorrectly) {
+            this.gameState.correctCount++;
+            this.hasBeenAnsweredCorrectly = true;
+        }
+
         this.gameState.streak++;
         this.callbacks.onCorrect(points, feedbackText);
         this.callbacks.onScoreChange(this.gameState.score);
@@ -109,9 +121,9 @@ handleCorrect(points, feedbackText) {
     handleIncorrect(feedbackText) {
         // NEW: Get the standard penalty from the ScoreCalculator
         const points = ScoreCalculator.getIncorrectPenalty();
-
+       this.gameState.incorrectCount++; 
         this.gameState.score = Math.max(0, this.gameState.score + points);
-        this.gameState.streak = 0; // Streak is always reset
+        // this.gameState.streak = 0; // Streak is always reset
         this.callbacks.onIncorrect(points, feedbackText);
         this.callbacks.onScoreChange(this.gameState.score);
         this.callbacks.onUpdateStats();
@@ -119,7 +131,13 @@ handleCorrect(points, feedbackText) {
 
    transitionToNext() {
         // Wait for 1 second (1000ms) before calling the nextQuestion method.
-        this.scene.time.delayedCall(1000, this.nextQuestion, [], this);
+        // this.scene.time.delayedCall(1000, this.nextQuestion, [], this);
+         this.scene.time.delayedCall(200, () => {
+             if (!this.gameState.gameActive) return; // Final safety check
+                 this.hasBeenAnsweredCorrectly = false;
+            this.nextQuestion();
+        });
+
     }
 
 

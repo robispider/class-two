@@ -30,7 +30,9 @@ export function startStage(scene, mode, level, allowedTables = [1, 2, 3, 4, 5]) 
     gameState.questionGenerator = new QuestionGenerator(gameState.maxNumber, gameState.performanceTracker);
     gameState.score = 0;
     gameState.streak = 0;
+    // gameState.totalBonus = 0;
     gameState.questionCount = 0;
+    gameState.incorrectCount = 0;    
     gameState.correctCount = 0;
     gameState.savedTime = 0;
     gameState.bonusRemaining = 0;
@@ -95,8 +97,12 @@ export function startQuestionSet(scene, mode, stage, allowedTables) {
             if (scene.statsLabels) {
                 scene.statsLabels.question.setText(`প্রশ্ন: ${toBangla(gameState.questionCount)}`);
                 scene.statsLabels.correct.setText(`সঠিক: ${toBangla(gameState.correctCount)}`);
-                scene.statsLabels.incorrect.setText(`ভুল: ${toBangla(gameState.questionCount - gameState.correctCount)}`);
-                scene.statsLabels.bonus.setText(`বোনাস: ${toBangla(gameState.streak * config.points.streakBonus)}`);
+                // scene.statsLabels.incorrect.setText(`ভুল: ${toBangla(gameState.questionCount - gameState.correctCount)}`);
+                           scene.statsLabels.incorrect.setText(`ভুল: ${toBangla(gameState.incorrectCount)}`);
+                // scene.statsLabels.bonus.setText(`বোনাস: ${toBangla(gameState.streak * config.points.streakBonus)}`);
+                // scene.statsLabels.bonus.setText(`বোনাস: ${toBangla(gameState.totalBonus)}`);
+                 scene.statsLabels.bonus.setText(`বোনাস: ${toBangla(gameState.streak * config.points.streakBonus)}`);
+                
             }
         },
         onCompleteSet: (feedback, success) => {
@@ -149,13 +155,17 @@ export function endStage(scene, success) {
     console.log('endStage called, success:', success);
     gameState.gameActive = false;
     if (scene.stopwatch) scene.stopwatch.stop();
-
+  // --- ADD THESE LINES ---
+    const totalTimeMS = scene.time.now - scene.stageStartTime;
+    const timeInSeconds = Math.round(totalTimeMS / 1000);
+    // --- END ADD ---
     const sessionScore = gameState.score;
        leaderboardManager.addScore(
         gameState.currentUser,
         gameState.currentLevel,
         gameState.currentStage,
-        sessionScore
+        sessionScore,
+             timeInSeconds 
     );
     
 

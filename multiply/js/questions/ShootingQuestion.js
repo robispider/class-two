@@ -48,6 +48,8 @@ class ShootingQuestion extends Question {
             missile: 0x0002, // Category for missiles
             debris: 0x0004  // Category for shattered plane fragments
         };
+        this.maxFiring=3;
+        this.currentMissileFired=0;
 
     }
 
@@ -64,6 +66,7 @@ class ShootingQuestion extends Question {
         this.questions = this.questionGenerator.generateBatch(this.numQuestions, fixedB, this.gameState.currentStage);
         this.currentQuestionIndex = 0;
         this.nextQuestion();
+
     }
 setup() {
     super.setup();
@@ -1021,6 +1024,16 @@ plane.setDepth(newScale);
         this.duckLayer.add([plane, labelContainer]);
     }
  shoot(pointer) {
+      this.currentMissileFired++;
+    //   console.log("missile fired:",this.currentMissileFired);
+      if (this.currentMissileFired>this.maxFiring)
+      {
+        //  this.transitionToNext();
+        this.handleTimeUp();
+        return;
+
+      }
+        
         if (this.remainingBullets <= 0 || this.isReloading) return;
         this.remainingBullets--;
         if (this.bulletIcons[this.remainingBullets]) this.bulletIcons[this.remainingBullets].destroy();
@@ -1210,6 +1223,7 @@ missile.body.ignoreGravity = true;
         }
     // 5. Clean up the original (now invisible) sprites after a delay
         this.scene.time.delayedCall(2000, () => {
+             targetSprite.active = false;
             if (targetSprite.labelContainer)
             {
             targetSprite.labelContainer.destroy();
@@ -1222,30 +1236,7 @@ missile.body.ignoreGravity = true;
 
 
 
-        // Animation
-        // this.scene.tweens.add({
-        //     targets: targetSprite,
-        //     alpha: 0,
-        //     duration: 1500,
-        //     delay: 1000,
-        //     onComplete: () => {
-        //         targetSprite.destroy();
-        //         targetSprite.labelContainer.destroy();
-        //         this.removeDuck(targetSprite);
-        //     }
-        // });
-        // this.scene.tweens.add({
-        //     targets: targetSprite.labelContainer,
-        //     alpha: 0,
-        //     scale: 5,
-        //     duration: 1400
-        // });
-
-        // Progress
-        // this.gameState.questionCount++;
-        // if (correct) {
-        //     this.transitionToNext(null);
-        // }
+ 
     }
 
 showFeedbackText(text, color, targetSprite) {
@@ -1389,6 +1380,18 @@ shatterPlane(plane) {
                 // Clean up destroyed missiles from the array
                 if (missile.trailEmitter) missile.trailEmitter.destroy();
                 this.missiles.splice(index, 1);
+                if (this.missiles.length<=0)
+    {
+      
+     if (this.currentMissileFired>=this.maxFiring)
+      {
+        //  this.transitionToNext();
+        this.handleTimeUp();
+        return;
+
+      }
+    }
+
                 return;
             }
                    if (missile.trailEmitter) {
@@ -1499,6 +1502,8 @@ shatterPlane(plane) {
         }
     }
 
+    
+
         // --- THIS REDUNDANT LOOP IS NOW REMOVED ---
         // this.targets.forEach(target => {
         //     if (target.labelContainer) {
@@ -1508,8 +1513,12 @@ shatterPlane(plane) {
         // });
     }
       handleTimeUp() {
+          // 1. Safety check to prevent errors if the game has already ended.
+        if (!gameState.gameActive) return;
+
         // this.cleanup(); // Clean the screen of all planes
-        this.handleIncorrect(config.points.incorrect, "সময় শেষ!");
+        // this.handleIncorrect(config.points.incorrect, "সময় শেষ!");
+        
         this.transitionToNext();
     }
    nextQuestion() {
@@ -1517,7 +1526,7 @@ shatterPlane(plane) {
             this.completeSet();
             return;
         }
-        
+          this.scene.stopQuestionTimer(); 
        
         this.questionData = this.generateQuestionData();
         if (this.currentQuestionIndex==0)
@@ -1540,6 +1549,7 @@ shatterPlane(plane) {
 
 
         this.currentQuestionIndex++;
+          this.currentMissileFired=0;
     }
 // js/questions/ShootingQuestion.js
 
@@ -1702,7 +1712,20 @@ playQuestionRevealAnimation(textObject) {
 
    
     completeSet() {
-        this.cleanup();
+        // this.cleanup();
+           this.scene.stopQuestionTimer();
+
+        // 2. Stop any new planes from appearing.
+        if (this.duckSpawner) {
+            this.duckSpawner.remove();
+            this.duckSpawner = null;
+        }
+             this.scene.input.off('pointerdown', this.shoot, this);
+
+        //       // 4. Stop all background sounds for this stage.
+        if (this.backgroundMusic) this.backgroundMusic.stop();
+        if (this.sirenSound) this.sirenSound.stop();
+
         const success = (this.gameState.correctCount / this.gameState.questionCount) * 100 >= this.gameState.controller.requiredCorrectPercent;
         
         const feedbackText = success ? "মিশন সফল!" : "মিশন ব্যর্থ!";

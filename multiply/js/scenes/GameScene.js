@@ -21,6 +21,7 @@ class GameScene extends Phaser.Scene {
     }
 
     create(data) {
+        this.stageStartTime = this.time.now; 
          gameState.timeLimit = config.initialTimeLimit;
          
         // --- 1. Responsive Layout Setup ---
