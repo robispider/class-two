@@ -172,17 +172,30 @@ export function endStage(scene, success) {
     // gameState.performanceTracker.saveStageHigh(gameState.currentLevel, gameState.currentStage, sessionScore);
     gameState.performanceTracker.saveOverallHigh(sessionScore);
     // --- NEW: Accuracy Check for Unlocking ---
-    const accuracyPercentage = (gameState.correctCount / gameState.questionCount) * 100;
-    const isUnlocked = accuracyPercentage >= gameState.controller.requiredCorrectPercent;
+    // const accuracyPercentage = (gameState.correctCount / gameState.questionCount) * 100;
+    // const isUnlocked = accuracyPercentage >= gameState.controller.requiredCorrectPercent;
 
-    if (success && isUnlocked) {
-        // Player passed AND met the accuracy requirement
+    // if (success && isUnlocked) {
+    //     // Player passed AND met the accuracy requirement
+    //     gameState.controller.unlockNextStage(gameState.currentLevel, gameState.currentStage);
+    //   //  showCongratsPane(scene, () => endGame(scene));
+    //     showCongratsPane(scene);
+    // } else {
+    //     // Player either failed or did not meet the 90% accuracy
+    //     endGame(scene);
+    // }
+
+      // --- MODIFIED LOGIC ---
+    const accuracyPercentage = gameState.questionCount > 0 ? (gameState.correctCount / gameState.questionCount) * 100 : 0;
+    const canAdvance = success && (accuracyPercentage >= gameState.controller.requiredCorrectPercent);
+
+    if (canAdvance) {
+        // Only unlock the next stage if they actually passed.
         gameState.controller.unlockNextStage(gameState.currentLevel, gameState.currentStage);
-        showCongratsPane(scene, () => endGame(scene));
-    } else {
-        // Player either failed or did not meet the 90% accuracy
-        endGame(scene);
     }
+
+    // --- ALWAYS show the summary pane, but tell it if the user won or not ---
+    showCongratsPane(scene, { didWin: canAdvance, accuracy: accuracyPercentage });
 }
 
 

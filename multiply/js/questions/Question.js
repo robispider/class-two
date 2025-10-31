@@ -133,7 +133,8 @@ handleCorrect(points, feedbackText) {
         // Wait for 1 second (1000ms) before calling the nextQuestion method.
         // this.scene.time.delayedCall(1000, this.nextQuestion, [], this);
          this.scene.time.delayedCall(200, () => {
-             if (!this.gameState.gameActive) return; // Final safety check
+            console.log(this.gameState.gameActive);
+             if (this.gameState.gameActive) return; // Final safety check
                  this.hasBeenAnsweredCorrectly = false;
             this.nextQuestion();
         });

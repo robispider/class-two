@@ -14,12 +14,30 @@ class GameScene extends Phaser.Scene {
 
             // Properties to hold timer and UI references
         this.stopwatchUI = null;
+          this.masterStopwatch = null;
         this.progressBarUI = null;
         this.questionTimer = null;
         this.questionTimeLimit = 0;
-
+    this.masterUI = null; 
     }
+  shutdown() {
+        // This method is called by Phaser automatically when the scene is shut down or restarted.
+        // We need to clean up any complex objects or timers to prevent memory leaks and errors on restart.
+        console.log("GameScene shutting down, cleaning up timers...");
 
+        if (this.masterUI) {
+            this.masterUI.destroy();
+            this.masterUI = null;
+        }
+        if (this.stopwatchUI && this.stopwatchUI.container) {
+            this.stopwatchUI.container.destroy();
+            this.stopwatchUI = null;
+        }
+        if (this.masterStopwatch) {
+            this.masterStopwatch.remove();
+            this.masterStopwatch = null;
+        }
+    }
     create(data) {
         this.stageStartTime = this.time.now; 
          gameState.timeLimit = config.initialTimeLimit;
@@ -155,43 +173,56 @@ class GameScene extends Phaser.Scene {
 
         // --- 6. Start Game Logic & Timers ---
         // Stopwatch UI is created here, but logic starts after startStage sets the time limit
-        if (gameState.timingModel === 'per-set') {
-            const stopwatchWidth = width * 0.25;
-            const stopwatchHeight = headerHeight * 0.8;
-            this.stopwatchUI = this.createStopwatchUI(width - padding, headerHeight / 2, stopwatchWidth, stopwatchHeight);
-            this.stopwatchUI.container.setOrigin(1, 0.5); // Align to the right
-            this.headerContainer.add(this.stopwatchUI.container);
-        }
+        // if (gameState.timingModel === 'per-set') {
+        //     const stopwatchWidth = width * 0.25;
+        //     const stopwatchHeight = headerHeight * 0.8;
+        //     this.stopwatchUI = this.createStopwatchUI(width - padding, headerHeight / 2, stopwatchWidth, stopwatchHeight);
+        //     this.stopwatchUI.container.setOrigin(1, 0.5); // Align to the right
+        //     this.headerContainer.add(this.stopwatchUI.container);
+        // }
 
         startStage(
             this,
-            gameState.mode,
-            gameState.currentLevel,
+               data.mode || gameState.mode || 'stage',
+            data.level || gameState.currentLevel || 1,
             data.allowedTables || gameState.controller.levels[gameState.currentLevel - 1] || [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
         );
+           // --- Update UI with correct initial state ---
+        this.titleLabel.setText(`লেভেল ${toBangla(gameState.currentLevel)}: স্টেজ ${toBangla(gameState.currentStage)}`);
+        this.scoreLabel.setText(`স্কোর: ${toBangla(gameState.score)}`);
 
         // Now that gameState.timeLimit is set, create the timer logic
-          if (gameState.timingModel === 'per-set') {
-            const stopwatchWidth = width * 0.3; // Made slightly wider for the text
-            const stopwatchHeight = headerHeight * 0.7;
-            const stopwatchX = (width - padding) - stopwatchWidth;
-            const stopwatchY = (headerHeight / 2) - (stopwatchHeight / 2);
+        //   if (gameState.timingModel === 'per-set') {
+        //     const stopwatchWidth = width * 0.3; // Made slightly wider for the text
+        //     const stopwatchHeight = headerHeight * 0.7;
+        //     const stopwatchX = (width - padding) - stopwatchWidth;
+        //     const stopwatchY = (headerHeight / 2) - (stopwatchHeight / 2);
 
-            // Hide the per-question UI, as we're using the master per-set timer.
-            this.masterUI.stopwatchContainer.setVisible(false);
+        //     // Hide the per-question UI, as we're using the master per-set timer.
+        //     this.masterUI.stopwatchContainer.setVisible(false);
+        //     this.masterUI.progressBarContainer.setVisible(false);
+
+        //     // Create and position the dedicated per-set stopwatch UI.
+        //     this.stopwatchUI = this.createStopwatchUI(stopwatchX, stopwatchY, stopwatchWidth, stopwatchHeight);
+        //     this.headerContainer.add(this.stopwatchUI.container);
+
+        //     // Calculate total time for the entire set.
+        //     const totalTime = gameState.timeLimit * config.questionsPerSession;
+        //     this.setupPerSetTimer(totalTime, this.stopwatchUI);
+        //     if (this.masterStopwatch) {
+        //         this.masterStopwatch.start();
+        //     }
+        // }
+         // 3. Determine the timer duration based on the (now correct) timing model
+        let timerDuration = gameState.timeLimit; // Default for 'per-question'
+        if (gameState.timingModel === 'per-set') {
+            timerDuration = gameState.timeLimit * config.questionsPerSession;
+            // For per-set, we don't need the individual progress bar, just the main timer
             this.masterUI.progressBarContainer.setVisible(false);
-
-            // Create and position the dedicated per-set stopwatch UI.
-            this.stopwatchUI = this.createStopwatchUI(stopwatchX, stopwatchY, stopwatchWidth, stopwatchHeight);
-            this.headerContainer.add(this.stopwatchUI.container);
-
-            // Calculate total time for the entire set.
-            const totalTime = gameState.timeLimit * config.questionsPerSession;
-            this.setupPerSetTimer(totalTime, this.stopwatchUI);
-            if (this.masterStopwatch) {
-                this.masterStopwatch.start();
-            }
         }
+
+        // 4. Start the single, modern stopwatch with the calculated duration
+        this.startQuestionTimer(timerDuration);
     }
   
     startQuestionTimer(duration) {

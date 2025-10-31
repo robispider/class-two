@@ -37,14 +37,15 @@ class LeaderboardManager {
         }
     }
 
-    /**
+   /**
      * Adds a new score entry for a specific user, level, and stage.
      * @param {string} user - The name of the user.
      * @param {number} level - The level number.
      * @param {number} stage - The stage number.
      * @param {number} score - The score achieved.
+     * @param {number} timeTaken - The time taken in seconds for the stage.
      */
-    addScore(user, level, stage, score) {
+    addScore(user, level, stage, score, timeTaken) { // --- FIX: Added 'timeTaken' parameter
         if (!user || score <= 0) {
             return; // Don't save empty entries
         }
@@ -57,7 +58,8 @@ class LeaderboardManager {
         const newEntry = {
             user: user,
             score: score,
-            date: new Date().toISOString() // Store date in a standard format
+            date: new Date().toISOString(), // Store date in a standard format
+            timeTaken: timeTaken || 0      // --- FIX: Added 'timeTaken' to the new entry object
         };
 
         const board = this.leaderboardData[boardKey];
@@ -67,6 +69,12 @@ class LeaderboardManager {
         board.sort((a, b) => {
             if (b.score !== a.score) {
                 return b.score - a.score;
+            }
+            // --- NEW: As a secondary sort, faster times are better
+            if (a.timeTaken && b.timeTaken) {
+                if (a.timeTaken !== b.timeTaken) {
+                    return a.timeTaken - b.timeTaken;
+                }
             }
             return new Date(b.date) - new Date(a.date);
         });

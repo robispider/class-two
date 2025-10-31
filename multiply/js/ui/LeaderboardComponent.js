@@ -148,7 +148,7 @@ console.log(entry.timeTaken);
  
                 // const dateText = this.scene.add.text(width / 2 + 200, yPos, toBangla(formattedDate), { ...entryStyle, fontSize: '20px' }).setOrigin(1, 0.5);
                 // const timeText = this.scene.add.text(width / 2 + 330, yPos, toBangla(formattedTime), { ...entryStyle, fontSize: '20px' }).setOrigin(1, 0.5);
-                       const durationText = this.scene.add.text(width / 2 + 90, yPos, formattedTimeTaken, { ...entryStyle, fontSize: '20px' }).setOrigin(1, 0.5);
+                       const durationText = this.scene.add.text(width / 2 + 120, yPos, formattedTimeTaken, { ...entryStyle, fontSize: '20px' }).setOrigin(1, 0.5);
                 const dateTimeText = this.scene.add.text(width / 2 + 320, yPos, fullDateTimeString, { ...entryStyle, fontSize: '14px' }).setOrigin(1, 0.5);
                 
                 const rowContainer = this.scene.add.container(0, 0, [rowBg, ...rankObjects, nameText, scoreText, durationText, dateTimeText]);

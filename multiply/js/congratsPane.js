@@ -65,21 +65,22 @@ function transitionOut(scene, pane, overlay, onCompleteCallback) {
 }
 
 /**
- * Displays a celebratory "Congratulations" pane after completing a stage.
+ * Displays a summary pane after completing a stage.
+ * @param {Phaser.Scene} scene - The calling scene.
+ * @param {object} options - Configuration for the pane.
+ * @param {boolean} options.didWin - Whether the user passed the stage.
+ * @param {number} options.accuracy - The user's accuracy percentage.
  */
-export function showCongratsPane(scene, callback) {
-    const overlay = scene.add.rectangle(0, 0, scene.cameras.main.width, scene.cameras.main.height, 0x000000, 0.7)
-        .setOrigin(0, 0)
-        .setAlpha(0);
+export function showCongratsPane(scene, options = {}) {
+    const { didWin = true, accuracy = 100 } = options;
+
+    const overlay = scene.add.rectangle(0, 0, scene.cameras.main.width, scene.cameras.main.height, 0x000000, 0.7).setOrigin(0, 0).setAlpha(0);
     scene.tweens.add({ targets: overlay, alpha: 1, duration: 300 });
 
-    const pane = scene.add.container(scene.cameras.main.width / 2, scene.cameras.main.height / 2);
-    pane.setDepth(400);
-
-    scene.sound.play('applause', { volume: 0.8 });
+    const pane = scene.add.container(scene.cameras.main.width / 2, scene.cameras.main.height / 2).setDepth(400);
 
     const PANE_WIDTH = 700;
-    const PANE_HEIGHT = 680; // Taller pane for the new button
+    const PANE_HEIGHT = 680;
 
     const background = scene.add.graphics();
     background.fillStyle(Phaser.Display.Color.HexStringToColor(config.colors.panel).color, 0.95);
@@ -88,59 +89,55 @@ export function showCongratsPane(scene, callback) {
     background.strokeRoundedRect(-PANE_WIDTH / 2, -PANE_HEIGHT / 2, PANE_WIDTH, PANE_HEIGHT, 32);
     pane.add(background);
 
-    const title = scene.add.text(0, -PANE_HEIGHT / 2 + 60, "চমৎকার!", {
-        fontSize: '64px', fontFamily: '"Noto Sans Bengali", sans-serif', fill: '#FFD700', fontStyle: 'bold', stroke: config.colors.panelBorder, strokeThickness: 6
-    }).setOrigin(0.5);
-    pane.add(title);
+    // --- CONDITIONAL CONTENT ---
+    let titleText, messageText, titleColor, soundEffect;
+    if (didWin) {
+        titleText = "চমৎকার!";
+        messageText = `এই পর্বের স্কোর: ${toBangla(gameState.score)}`;
+        titleColor = '#FFD700'; // Gold
+        soundEffect = 'applause';
+    } else {
+        titleText = "আবার চেষ্টা করুন";
+        messageText = `পরবর্তী স্টেজে যেতে ${toBangla(gameState.controller.requiredCorrectPercent)}% সঠিক উত্তর প্রয়োজন।\nআপনার সঠিকতার হার: ${toBangla(Math.floor(accuracy))}%`;
+        titleColor = '#FF4500'; // Red-Orange
+        soundEffect = 'button-shake'; // A failure sound
+    }
 
-    const sessionScoreLabel = scene.add.text(0, -PANE_HEIGHT / 2 + 130, `এই পর্বের স্কোর: ${toBangla(gameState.score)}`, {
-        fontSize: '36px', fontFamily: '"Noto Sans Bengali", sans-serif', fill: config.colors.text, fontStyle: 'bold'
-    }).setOrigin(0.5);
-    pane.add(sessionScoreLabel);
+    scene.sound.play(soundEffect, { volume: 0.8 });
 
-    const leaderboardTitle = scene.add.text(0, -PANE_HEIGHT / 2 + 180, `--- লেভেল ${toBangla(gameState.currentLevel)} - স্টেজ ${toBangla(gameState.currentStage)} (সেরা স্কোর) ---`, {
-        fontSize: '24px', fontFamily: '"Noto Sans Bengali", sans-serif', fill: config.colors.text,
-    }).setOrigin(0.5);
+    const title = scene.add.text(0, -PANE_HEIGHT / 2 + 60, titleText, { fontSize: '64px', fontFamily: '"Noto Sans Bengali", sans-serif', fill: titleColor, fontStyle: 'bold', stroke: config.colors.panelBorder, strokeThickness: 6 }).setOrigin(0.5);
+    const message = scene.add.text(0, -PANE_HEIGHT / 2 + 135, messageText, { fontSize: '30px', fontFamily: '"Noto Sans Bengali", sans-serif', fill: config.colors.text, align: 'center' }).setOrigin(0.5);
+    pane.add([title, message]);
+
+    // --- LEADERBOARD ---
+    const leaderboardTitle = scene.add.text(0, -PANE_HEIGHT / 2 + 180, `--- লেভেল ${toBangla(gameState.currentLevel)} - স্টেজ ${toBangla(gameState.currentStage)} (সেরা স্কোর) ---`, { fontSize: '24px', fontFamily: '"Noto Sans Bengali", sans-serif', fill: config.colors.text }).setOrigin(0.5);
     pane.add(leaderboardTitle);
-
-    // --- NEW: Display Top 3 and Current Player's Performance ---
+    
     const allScores = leaderboardManager.getScores(gameState.currentLevel, gameState.currentStage);
     const leaderboardStartY = -PANE_HEIGHT / 2 + 225;
-
     if (allScores.length === 0) {
-        const noData = scene.add.text(0, leaderboardStartY + 50, "এখনো কোনো স্কোর নেই!", { fontSize: '22px', fill: config.colors.text}).setOrigin(0.5);
-        pane.add(noData);
+        pane.add(scene.add.text(0, leaderboardStartY + 50, "এখনো কোনো স্কোর নেই!", { fontSize: '22px', fill: config.colors.text}).setOrigin(0.5));
     } else {
         const currentUser = gameState.currentUser;
         const userRankIndex = allScores.findIndex(entry => entry.user.name === currentUser.name);
-
         const topEntries = allScores.slice(0, 3);
         let displayEntries = [...topEntries];
-
-        // If the user is not in the top 3 and exists in the list, add them for context.
         if (userRankIndex > 2) {
             displayEntries.push({ isSeparator: true });
-            // Add the user's entry with their actual rank number
             displayEntries.push({ ...allScores[userRankIndex], rank: userRankIndex + 1 });
         }
-
         let yOffset = 0;
         displayEntries.forEach((entry, index) => {
             if (entry.isSeparator) {
-                const separator = scene.add.text(0, leaderboardStartY + yOffset, '...', { fontSize: '24px', fill: config.colors.text }).setOrigin(0.5);
-                pane.add(separator);
+                pane.add(scene.add.text(0, leaderboardStartY + yOffset, '...', { fontSize: '24px', fill: config.colors.text }).setOrigin(0.5));
                 yOffset += 35;
                 return;
             }
-
-            const rank = entry.rank || index + 1; // Use stored rank if available, otherwise use index
+            const rank = entry.rank || index + 1;
             const yPos = leaderboardStartY + yOffset;
             const isCurrentUser = entry.user.name === currentUser.name;
-
-            // Highlight the current user's score
             const textStyle = { fontSize: '24px', fontFamily: '"Noto Sans Bengali", sans-serif', fill: isCurrentUser ? '#FFD700' : config.colors.text };
             const scoreStyle = { ...textStyle, fontStyle: 'bold' };
-
             const rankText = scene.add.text(-250, yPos, `${toBangla(rank)}. ${entry.user.name}`, textStyle).setOrigin(0, 0.5);
             const scoreText = scene.add.text(250, yPos, toBangla(entry.score), scoreStyle).setOrigin(1, 0.5);
             pane.add([rankText, scoreText]);
@@ -148,35 +145,23 @@ export function showCongratsPane(scene, callback) {
         });
     }
     
-    // Adjust button positions for the new button
+    // --- BUTTONS ---
     const buttonY = PANE_HEIGHT / 2 - 250;
-    
-    // --- REUSE: The button now opens the full LeaderboardComponent ---
     const leaderboardButton = createButton(scene, 0, buttonY, "পূর্ণ লিডারবোর্ড দেখুন", 'button-cyan', () => {
-        const lbComponent = new LeaderboardComponent(scene);
-        lbComponent.show({
-            level: gameState.currentLevel,
-            stage: gameState.currentStage
-        });
+        new LeaderboardComponent(scene).show({ level: gameState.currentLevel, stage: gameState.currentStage });
     });
     
     const advanceButton = createButton(scene, 0, buttonY + 70, "পরবর্তী স্টেজ", 'button-green', () => {
         let nextStage = gameState.currentStage + 1;
-
         let nextLevel = gameState.currentLevel;
-        
-        const stagesPerLevel = gameState.controller.stagesPerLevel;
-
-        if (nextStage > stagesPerLevel) {
+        if (nextStage > gameState.controller.stagesPerLevel) {
             nextStage = 1;
             nextLevel += 1;
         }
-
         transitionOut(scene, pane, overlay, () => {
             gameState.currentStage = nextStage;
             gameState.currentLevel = nextLevel;
-            const allowedTables = gameState.controller.levels[nextLevel - 1];
-            startStage(scene, gameState.mode, nextLevel, allowedTables);
+            startStage(scene, gameState.mode, nextLevel, gameState.controller.levels[nextLevel - 1]);
         });
     });
 
@@ -189,38 +174,28 @@ export function showCongratsPane(scene, callback) {
     });
 
     const backButton = createButton(scene, 0, buttonY + 210, "মেনু", 'button-red', () => {
-        transitionOut(scene, pane, overlay, () => {
-            endGame(scene);
-        });
+        transitionOut(scene, pane, overlay, () => endGame(scene));
     });
 
     pane.add([leaderboardButton, advanceButton, replayButton, backButton]);
     
-    const stagesPerLevel = gameState.controller.stagesPerLevel;
-    const isLastStageOfLevel = gameState.currentStage >= stagesPerLevel;
+    const isLastStageOfLevel = gameState.currentStage >= gameState.controller.stagesPerLevel;
     const isLastLevel = gameState.currentLevel >= gameState.controller.levels.length;
 
-    if (isLastStageOfLevel && isLastLevel) {
+    if (!didWin || (isLastStageOfLevel && isLastLevel)) {
         advanceButton.setAlpha(0.5);
         advanceButton.getAt(0).disableInteractive();
     }
 
+    // --- Pane entrance animation ---
     pane.setScale(0);
-    scene.tweens.add({
-        targets: pane,
-        scale: 1,
-        duration: 500,
-        ease: 'Elastic.easeOut',
-        easeParams: [1.1, 0.7]
-    });
-
-    const emitter = scene.add.particles(0, 0, 'particle', {
-        x: pane.x, y: pane.y, speed: { min: -400, max: 400 }, angle: { min: 0, max: 360 }, scale: { start: 1, end: 0 },
-        blendMode: 'ADD', lifespan: 800, gravityY: 100, quantity: 100, emitting: false
-    });
-    emitter.setDepth(401);
-    emitter.explode();
-}
+    scene.tweens.add({ targets: pane, scale: 1, duration: 500, ease: 'Elastic.easeOut', easeParams: [1.1, 0.7] });
+    
+    const emitter = scene.add.particles(0, 0, 'particle', { x: pane.x, y: pane.y, speed: { min: -400, max: 400 }, angle: { min: 0, max: 360 }, scale: { start: 1, end: 0 }, blendMode: 'ADD', lifespan: 800, gravityY: 100, quantity: 100, emitting: false }).setDepth(401);
+    if (didWin) {
+        emitter.explode();
+    }
+} 
 
 /**
  * A robust, tween-based countdown animation.

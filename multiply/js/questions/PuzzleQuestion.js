@@ -196,6 +196,22 @@ class PuzzleQuestion extends Question {
             if (!dropped && !gameObject.getData('isPlaced')) this.returnPieceToHome(gameObject);
         });
     }
+    handleCorrect(points, feedbackText) {
+        const streakBonus = this.gameState.streak * config.points.streakBonus;
+        this.gameState.totalBonus += streakBonus;
+
+        this.gameState.score = Math.max(0, this.gameState.score + points);
+        
+        // --- FIX: Directly increment the correct count ---
+        // This bypasses the faulty 'hasBeenAnsweredCorrectly' check from the parent class,
+        // which is not suitable for multi-part questions like this puzzle.
+        this.gameState.correctCount++;
+
+        this.gameState.streak++;
+        this.callbacks.onCorrect(points, feedbackText);
+        this.callbacks.onScoreChange(this.gameState.score);
+        this.callbacks.onUpdateStats();
+    }
 
     handleCorrectDrop(piece, dropZone) {
         this.isProcessing = true;
@@ -236,7 +252,7 @@ class PuzzleQuestion extends Question {
     
            
         const emitter = this.scene.add.particles(400, 300, 'particle', {
-            frame: 'red',
+            tint: [ 0xff0000, 0xff7700 ],
             blendMode: 'ADD',
             lifespan: 1500,
             frequency: 16,
