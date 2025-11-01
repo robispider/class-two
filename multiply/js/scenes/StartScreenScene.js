@@ -9,8 +9,10 @@ import GameplayController from '../GameplayController.js';
 import { loadedAssetKeys, assetManifest } from '../AssetManager.js';
 
 // --- UI Layout Constants ---
-const MAIN_BUTTON_SCALE = 0.4;
-const MENU_BUTTON_SCALE = 0.25;
+const MAIN_BUTTON_SCALE = 0.35;
+const MENU_BUTTON_SCALE = 0.4;
+const MENU_BUTTON_SCALE_X = 0.35;
+const MENU_BUTTON_SCALE_Y = 0.25;
 const LEVEL_MENU_SPACING = 70;
 const STAGE_MENU_SPACING = 70;
 
@@ -294,7 +296,7 @@ console.log('music created – using HTML5 Audio');
             });
         }));
 
-        const panelWidth = 250;
+        const panelWidth = 280;
         const panelHeight = 420;
         const panelY = height * 0.6;
         
@@ -402,10 +404,10 @@ console.log('music created – using HTML5 Audio');
         return [button, btnText];
     }
 
-    createMenuButton(x, y, number, helpString, callback, isLocked = false) {
+    createMenuButton(x, y, label, number, helpString, callback, isLocked = false) {
         const buttonImageKey = isLocked ? 'button-gray' : 'button-cyan';
-        const buttonImage = this.add.image(0, 0, buttonImageKey).setScale(MENU_BUTTON_SCALE);
-        const buttonText = this.add.text(0, 0, toBangla(number), { fontSize: '32px', fontFamily: '"Noto Sans Bengali", sans-serif', fill: config.colors.text, fontStyle: 'bold' }).setOrigin(0.5);
+        const buttonImage = this.add.image(0, 0, buttonImageKey).setScale(MENU_BUTTON_SCALE_X,MENU_BUTTON_SCALE_Y);
+        const buttonText = this.add.text(0, 0, label, { fontSize: '32px', fontFamily: '"Noto Sans Bengali", sans-serif', fill: config.colors.text, fontStyle: 'bold' }).setOrigin(0.5);
         
         const buttonContainer = this.add.container(x, y, [buttonImage, buttonText]);
         buttonContainer.setSize(buttonImage.displayWidth, buttonImage.displayHeight);
@@ -427,10 +429,10 @@ console.log('music created – using HTML5 Audio');
     createLevelMenu(x, y) {
         const startY = y - 110;
         const callback = (btn, val) => this.updateSelectionEffect('level', btn, val);
-        const level1 = this.createMenuButton(x, startY + (0 * LEVEL_MENU_SPACING), 1, 'সহজ প্রশ্ন দিয়ে লেভেল ১ শুরু করুন।', callback, !gameState.controller.isStageUnlocked(1, 1));
-        const level2 = this.createMenuButton(x, startY + (1 * LEVEL_MENU_SPACING), 2, 'মাঝারি প্রশ্ন দিয়ে লেভেল ২ শুরু করুন।', callback, !gameState.controller.isStageUnlocked(2, 1));
-        const level3 = this.createMenuButton(x, startY + (2 * LEVEL_MENU_SPACING), 3, 'কঠিন প্রশ্ন দিয়ে লেভেল ৩ শুরু করুন।', callback, !gameState.controller.isStageUnlocked(3, 1));
-        const level4 = this.createMenuButton(x, startY + (3 * LEVEL_MENU_SPACING), 4, 'বিশেষজ্ঞ প্রশ্ন দিয়ে লেভেল ৪ শুরু করুন।', callback, !gameState.controller.isStageUnlocked(4, 1));
+        const level1 = this.createMenuButton(x, startY + (0 * LEVEL_MENU_SPACING),toBangla(1),1, '১-৫ এর নামতা দিয়ে লেভেল ১ শুরু করুন।', callback, !gameState.controller.isStageUnlocked(1, 1));
+        const level2 = this.createMenuButton(x, startY + (1 * LEVEL_MENU_SPACING), toBangla(2),2, '৬-১০ এর নামতা দিয়ে লেভেল ২ শুরু করুন।', callback, !gameState.controller.isStageUnlocked(2, 1));
+        const level3 = this.createMenuButton(x, startY + (2 * LEVEL_MENU_SPACING), toBangla(3),3, '১১-১৫ এর নামতা দিয়ে লেভেল ৩ শুরু করুন।', callback, !gameState.controller.isStageUnlocked(3, 1));
+        const level4 = this.createMenuButton(x, startY + (3 * LEVEL_MENU_SPACING), toBangla(4),4, '১৬-২০ এর নামতা দিয়ে লেভেল ৪ শুরু করুন।', callback, !gameState.controller.isStageUnlocked(4, 1));
         return [level1, level2, level3, level4];
     }
     
@@ -438,11 +440,11 @@ console.log('music created – using HTML5 Audio');
         const startY = y - 110;
         const callback = (btn, val) => this.updateSelectionEffect('stage', btn, val);
         const currentLevel = gameState.currentLevel;
-        const stage1 = this.createMenuButton(x, startY + (0 * STAGE_MENU_SPACING), 1, 'স্টেজ ১ বাছাই করুন।', callback, !gameState.controller.isStageUnlocked(currentLevel, 1));
-        const stage2 = this.createMenuButton(x, startY + (1 * STAGE_MENU_SPACING), 2, 'স্টেজ ২ বাছাই করুন।', callback, !gameState.controller.isStageUnlocked(currentLevel, 2));
-        const stage3 = this.createMenuButton(x, startY + (2 * STAGE_MENU_SPACING), 3, 'স্টেজ ৩ বাছাই করুন।', callback, !gameState.controller.isStageUnlocked(currentLevel, 3));
-        const stage4 = this.createMenuButton(x, startY + (3 * STAGE_MENU_SPACING), 4, 'স্টেজ ৪ বাছাই করুন।', callback, !gameState.controller.isStageUnlocked(currentLevel, 4));
-        const stage5 = this.createMenuButton(x, startY + (4 * STAGE_MENU_SPACING), 5, 'স্টেজ ৫ বাছাই করুন।', callback, !gameState.controller.isStageUnlocked(currentLevel, 5));
+        const stage1 = this.createMenuButton(x, startY + (0 * STAGE_MENU_SPACING),"ছবির গুণ", 1, 'স্টেজ ১ বাছাই করুন।', callback, !gameState.controller.isStageUnlocked(currentLevel, 1));
+        const stage2 = this.createMenuButton(x, startY + (1 * STAGE_MENU_SPACING), "ধাঁধার ছবি",2, 'স্টেজ ২ বাছাই করুন।', callback, !gameState.controller.isStageUnlocked(currentLevel, 2));
+        const stage3 = this.createMenuButton(x, startY + (2 * STAGE_MENU_SPACING),"বাক্স রহস্য", 3, 'স্টেজ ৩ বাছাই করুন।', callback, !gameState.controller.isStageUnlocked(currentLevel, 3));
+        const stage4 = this.createMenuButton(x, startY + (3 * STAGE_MENU_SPACING), "সংখ্যার জুটি",4, 'স্টেজ ৪ বাছাই করুন।', callback, !gameState.controller.isStageUnlocked(currentLevel, 4));
+        const stage5 = this.createMenuButton(x, startY + (4 * STAGE_MENU_SPACING),"আকাশের প্রহরী", 5, 'স্টেজ ৫ বাছাই করুন।', callback, !gameState.controller.isStageUnlocked(currentLevel, 5));
         return [stage1, stage2, stage3, stage4, stage5];
     }
 

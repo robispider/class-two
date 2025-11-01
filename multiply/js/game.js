@@ -119,11 +119,17 @@ export function startQuestionSet(scene, mode, stage, allowedTables) {
       
          gameState.timingModel = 'per-question';
     let QuestionClass;
-    if (stage <= 2 || (mode === "practice" && stage <= 3)) {
-        QuestionClass = StandardQuestion;
-    } else if (stage === 3) {
+    if (stage===1)
+    {
+QuestionClass = StandardQuestion;
+    }
+    else if (stage ===2) {
          QuestionClass = PuzzleQuestion;
         gameState.timingModel = 'per-set';
+        
+    } else if (stage === 3) {
+        
+        QuestionClass = StandardQuestion;
     } else if (stage === 4) {
        
         QuestionClass = FactorPairsQuestion;
