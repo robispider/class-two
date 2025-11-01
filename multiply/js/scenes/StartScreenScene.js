@@ -446,6 +446,7 @@ console.log('music created – using HTML5 Audio');
         const stage4 = this.createMenuButton(x, startY + (3 * STAGE_MENU_SPACING), "সংখ্যার জুটি",4, 'স্টেজ ৪ বাছাই করুন।', callback, !gameState.controller.isStageUnlocked(currentLevel, 4));
         const stage5 = this.createMenuButton(x, startY + (4 * STAGE_MENU_SPACING),"আকাশের প্রহরী", 5, 'স্টেজ ৫ বাছাই করুন।', callback, !gameState.controller.isStageUnlocked(currentLevel, 5));
         return [stage1, stage2, stage3, stage4, stage5];
+      
     }
 
     updateSelectionEffect(type, newSelectedButton, value, isInitialSetup = false) {

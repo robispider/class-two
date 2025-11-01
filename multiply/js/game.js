@@ -22,6 +22,7 @@ export function startStage(scene, mode, level, allowedTables = [1, 2, 3, 4, 5]) 
     gameState.mode = mode;
     gameState.currentLevel = level;
     gameState.currentStage = gameState.currentStage || 1;
+    gameState.currentStageName="";
     gameState.gameActive = true;
     gameState.performanceTracker = new PerformanceTracker();
     gameState.performanceTracker.loadFromLocal();
@@ -38,6 +39,7 @@ export function startStage(scene, mode, level, allowedTables = [1, 2, 3, 4, 5]) 
     gameState.bonusRemaining = 0;
     gameState.isBonus = false;
     gameState.mainAnswered = 0;
+
     startQuestionSet(scene, mode, gameState.currentStage, allowedTables);
     if (scene.stopwatch) {
         scene.stopwatch.setTime(gameState.timeLimit);
@@ -119,26 +121,37 @@ export function startQuestionSet(scene, mode, stage, allowedTables) {
       
          gameState.timingModel = 'per-question';
     let QuestionClass;
+    //   "ছবির গুণ"
+    //     "ধাঁধার ছবি"
+    //     "বাক্স রহস্য"
+    //     "সংখ্যার জুটি"
+    //     "আকাশের প্রহরী"
     if (stage===1)
     {
 QuestionClass = StandardQuestion;
+gameState.currentStageName="ছবির গুণ";
     }
     else if (stage ===2) {
          QuestionClass = PuzzleQuestion;
         gameState.timingModel = 'per-set';
+        gameState.currentStageName="ধাঁধার ছবি";
         
     } else if (stage === 3) {
         
         QuestionClass = StandardQuestion;
+        gameState.currentStageName="বাক্স রহস্য";
     } else if (stage === 4) {
        
         QuestionClass = FactorPairsQuestion;
+        gameState.currentStageName="সংখ্যার জুটি";
    
     } else if (stage === 5) {
         QuestionClass = ShootingQuestion;
+        gameState.currentStageName="আকাশের প্রহরী";
     } else {
         console.error('No valid QuestionClass for stage:', stage);
         QuestionClass = StandardQuestion; // Fallback
+        gameState.currentStageName="ছবির গুণ";
     }
     console.log('Selected QuestionClass:', QuestionClass.name); // Debug
     try {

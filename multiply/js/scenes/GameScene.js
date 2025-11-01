@@ -69,12 +69,13 @@ class GameScene extends Phaser.Scene {
 
         // --- 2. Header Redesign ---
         this.headerContainer = this.add.container(0, 0).setDepth(200);
-
+console.log(gameState.currentStageName, gameState.currentStage);
+// gameState.currentStageName="dummy";
         // Title Label (Left Aligned)
         this.titleLabel = this.add.text(
             padding,
             headerHeight *.2,
-            `লেভেল ${toBangla(gameState.currentLevel)}: স্টেজ ${toBangla(gameState.currentStage)}`, {
+            `লেভেল: ${toBangla(gameState.currentLevel)}| স্টেজ: ${gameState.currentStageName}`, {
                 fontSize: '30px',
                  fontFamily: '"Noto Sans Bengali", sans-serif', 
                 fill: config.colors.text,
@@ -188,7 +189,7 @@ class GameScene extends Phaser.Scene {
             data.allowedTables || gameState.controller.levels[gameState.currentLevel - 1] || [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
         );
            // --- Update UI with correct initial state ---
-        this.titleLabel.setText(`লেভেল ${toBangla(gameState.currentLevel)}: স্টেজ ${toBangla(gameState.currentStage)}`);
+        this.titleLabel.setText(`লেভেল ${toBangla(gameState.currentLevel)} - স্টেজ: ${gameState.currentStageName}`);
         this.scoreLabel.setText(`স্কোর: ${toBangla(gameState.score)}`);
 
         // Now that gameState.timeLimit is set, create the timer logic
