@@ -128,9 +128,9 @@ export class Stopwatch {
             },
             callbackScope: this.scene
         });
-        
+        const lifespan=Math.min(duration*150,15*150);
         if (this.capemitter) {
-            this.capemitter.setParticleLifespan(duration*250);
+            this.capemitter.setParticleLifespan(lifespan);
             this.capemitter.start();
         }
     }

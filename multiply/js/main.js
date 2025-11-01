@@ -11,18 +11,16 @@ import StatsScreenScene from './scenes/StatsScreenScene.js';
 import LeaderboardScreenScene from './scenes/LeaderboardScreenScene.js';
 import GameScene from './scenes/GameScene.js';
 import PracticeScene from './scenes/PracticeScene.js'; 
-
-
-// import MatterCollisionPlugin from 'phaser-matter-collision-plugin';
+import LoaderScene from './scenes/LoaderScene.js'; // --- ADDED ---
 
 const phaserConfig = {
     type: Phaser.AUTO,
     width: 1024,
     height: 768,
     backgroundColor: '#333333',
-     parent: 'game-container', // Tell Phaser where to render the game
+    parent: 'game-container',
     dom: {
-        createContainer: true  // Enable DOM element support
+        createContainer: true
     },
     scene: [
         BootScene,
@@ -33,6 +31,8 @@ const phaserConfig = {
         PracticeScreenScene,
         StatsScreenScene,
         LeaderboardScreenScene,
+        LoaderScene, // --- ADDED ---
+        
         GameScene,
         PracticeScene 
     ],
@@ -47,15 +47,9 @@ const phaserConfig = {
             debug: false
         }
     },
-    //   plugins: {
-    //     scene: [
-    //         {
-    //             plugin: MatterCollisionPlugin, // The plugin class
-    //             key: 'matterCollision',      // Where to store in Scene.Systems, e.g. scene.sys.matterCollision
-    //             mapping: 'matterCollision'   // Where to store in the Scene, e.g. scene.matterCollision
-    //         }
-    //     ]
-    // }
+    audio: {
+        disableWebAudio: false  // <-- ADD THIS: Forces HTML5 Audio mode
+    }
 };
 
 const game = new Phaser.Game(phaserConfig);

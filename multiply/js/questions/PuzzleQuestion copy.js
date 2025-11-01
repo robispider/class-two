@@ -8,9 +8,9 @@ import { ScoreCalculator } from '../ScoreCalculator.js';
 class PuzzleQuestion extends Question {
     constructor(...args) {
         super(...args);
-        this.helpText = "প্রতিটি গুণফল সমাধান করুন। তারপর সঠিক উত্তরের ছবির টুকরাটি মাঝের গ্রিডে টেনে এনে বসিয়ে দিন। ছবিটি সম্পূর্ণ করুন!";
-        this.puzzleCols = 5;
-        this.puzzleRows = 4;
+        this.helpText = "বাম পাশের প্রতিটি গুণফল সমাধান করুন। তারপর সঠিক উত্তরের ছবির টুকরাটি ডান পাশের গ্রিডে টেনে এনে বসিয়ে দিন। ছবিটি সম্পূর্ণ করুন!";
+        this.puzzleCols = 4;
+        this.puzzleRows = 3;
         this.numQuestions = this.puzzleCols * this.puzzleRows;
         this.questions = [];
         this.answerBlockQuestions = [];
@@ -72,29 +72,12 @@ class PuzzleQuestion extends Question {
         panel.strokeRoundedRect(0, 0, panelW, panelH, 30);
         this.vizContainer.add(panel);
         this.createdObjects.push(panel);
-        
         const contentW = panelW - 20;
         const contentH = panelH - 20;
-        const contentInternalPadding = 20;
-
-        const questionAreaDepth = contentH * 0.22;
-        const questionAreaWidth = contentW * 0.25;
-
-        const centerGridW = contentW - (2 * questionAreaWidth);
-        const centerGridH = contentH - (2 * questionAreaDepth);
-        const centerGridX = contentInternalPadding + questionAreaWidth;
-        const centerGridY = contentInternalPadding + questionAreaDepth;
-
-        this.centerContainer = this.scene.add.container(centerGridX, centerGridY).setSize(centerGridW, centerGridH);
-
-        this.topQuestionsContainer = this.scene.add.container(centerGridX, contentInternalPadding).setSize(centerGridW, questionAreaDepth);
-        this.bottomQuestionsContainer = this.scene.add.container(centerGridX, centerGridY + centerGridH).setSize(centerGridW, questionAreaDepth);
-        this.leftQuestionsContainer = this.scene.add.container(contentInternalPadding, contentInternalPadding).setSize(questionAreaWidth, contentH);
-        this.rightQuestionsContainer = this.scene.add.container(centerGridX + centerGridW, contentInternalPadding).setSize(questionAreaWidth, contentH);
-        
-        this.vizContainer.add([this.centerContainer, this.topQuestionsContainer, this.bottomQuestionsContainer, this.leftQuestionsContainer, this.rightQuestionsContainer]);
-        this.createdObjects.push(this.centerContainer, this.topQuestionsContainer, this.bottomQuestionsContainer, this.leftQuestionsContainer, this.rightQuestionsContainer);
-
+        this.leftContainer = this.scene.add.container(panelPadding + 10, panelPadding + 10).setSize(contentW / 2, contentH);
+        this.rightContainer = this.scene.add.container(this.leftContainer.x + this.leftContainer.width, panelPadding + 10).setSize(contentW / 2, contentH);
+        this.vizContainer.add([this.leftContainer, this.rightContainer]);
+        this.createdObjects.push(this.leftContainer, this.rightContainer);
         const puzzleTexture = this.scene.textures.get('puzzle1');
         const img = puzzleTexture.getSourceImage();
         const extrusion = 1, margin = extrusion, spacing = 2 * extrusion;
@@ -109,27 +92,30 @@ class PuzzleQuestion extends Question {
             }
         }
         
+        // ✅ --- MODIFICATION 2: Create an aspect-ratio-correct grid ---
         const imageAspectRatio = img.width / img.height;
-        const containerAspectRatio = this.centerContainer.width / this.centerContainer.height;
+        const containerAspectRatio = this.rightContainer.width / this.rightContainer.height;
         let finalGridW, finalGridH;
 
         if (imageAspectRatio > containerAspectRatio) {
-            finalGridW = this.centerContainer.width * 0.95;
+            // Container is taller/skinnier than the image, so width is the constraint
+            finalGridW = this.rightContainer.width * 0.95; // Use 95% to leave some padding
             finalGridH = finalGridW / imageAspectRatio;
         } else {
-            finalGridH = this.centerContainer.height * 0.95;
+            // Container is wider than the image, so height is the constraint
+            finalGridH = this.rightContainer.height * 0.95;
             finalGridW = finalGridH * imageAspectRatio;
         }
 
         const gridContainer = this.scene.add.container(
-            (this.centerContainer.width - finalGridW) / 2,
-            (this.centerContainer.height - finalGridH) / 2
+            (this.rightContainer.width - finalGridW) / 2,
+            (this.rightContainer.height - finalGridH) / 2
         ).setSize(finalGridW, finalGridH);
-        this.centerContainer.add(gridContainer);
+        this.rightContainer.add(gridContainer);
         this.createdObjects.push(gridContainer);
 
-        this.createAnswerGrid(gridContainer);
-        this.createQuestionLayout();
+        this.createAnswerGrid(gridContainer); // Pass the new correctly-sized container
+        this.createQuestionList(this.leftContainer);
         this.setupDragAndDrop();
     }
 
@@ -156,95 +142,33 @@ class PuzzleQuestion extends Question {
         }
     }
 
-    createQuestionLayout() {
-        const baseQuestionsPerSide = Math.floor(this.numQuestions / 4);
-        const remainder = this.numQuestions % 4;
-        const counts = Array(4).fill(baseQuestionsPerSide);
-        for (let i = 0; i < remainder; i++) {
-            counts[i]++;
+    createQuestionList(container) {
+        const rowH = container.height / this.numQuestions;
+        for (let i = 0; i < this.numQuestions; i++) {
+            const questionData = this.questions[i];
+            const y = i * rowH;
+            const rowContainer = this.scene.add.container(0, y).setSize(container.width, rowH);
+            container.add(rowContainer);
+            const text = this.scene.add.text(10, rowH / 2, `${toBangla(questionData.a)} × ${toBangla(questionData.b)} =`, { fontSize: '28px', fontFamily: '"Noto Sans Bengali", sans-serif', fill: config.colors.text, fontStyle: 'bold' }).setOrigin(0, 0.5);
+            rowContainer.add(text);
+            const answerIndex = this.answerBlockQuestions.findIndex(q => q.target === questionData.target);
+            const frameName = `piece_${answerIndex % this.puzzleCols}-${Math.floor(answerIndex / this.puzzleCols)}`;
+            const pieceContainer = this.scene.add.container(0, 0);
+            const puzzlePiece = this.scene.add.image(0, 0, 'puzzle1', frameName);
+            const scale = (rowH * 0.9) / puzzlePiece.height;
+            puzzlePiece.setScale(scale);
+            pieceContainer.add(puzzlePiece);
+            pieceContainer.setSize(puzzlePiece.displayWidth, puzzlePiece.displayHeight);
+            this.vizContainer.add(pieceContainer);
+            const piecePlaceholderX = container.x + rowContainer.x + (container.width * 0.3);
+            const piecePlaceholderY = container.y + rowContainer.y + (rowH / 2);
+            pieceContainer.setPosition(piecePlaceholderX, piecePlaceholderY);
+            pieceContainer.initposition={x:piecePlaceholderX, y:piecePlaceholderY}
+            pieceContainer.setInteractive({ draggable: true, useHandCursor: true });
+            pieceContainer.setData({ questionData: questionData, originalX: piecePlaceholderX, originalY: piecePlaceholderY, isPlaced: false, });
+            this.draggablePieces.push(pieceContainer);
         }
-
-        const sideConfigs = [
-            { container: this.topQuestionsContainer, orientation: 'horizontal', count: counts[0] },
-            { container: this.rightQuestionsContainer, orientation: 'vertical', count: counts[1] },
-            { container: this.bottomQuestionsContainer, orientation: 'horizontal', count: counts[2] },
-            { container: this.leftQuestionsContainer, orientation: 'vertical', count: counts[3] }
-        ];
-
-        let questionIndex = 0;
-
-        sideConfigs.forEach(side => {
-            const { container, orientation, count } = side;
-            const isHorizontal = orientation === 'horizontal';
-            
-            const slotWidth = isHorizontal ? container.width / count : container.width;
-            const slotHeight = isHorizontal ? container.height : container.height / count;
-
-            for (let i = 0; i < count; i++) {
-                if (questionIndex >= this.numQuestions) break;
-
-                const questionData = this.questions[questionIndex];
-                
-                const slotX = isHorizontal ? i * slotWidth : 0;
-                const slotY = isHorizontal ? 0 : i * slotHeight;
-
-                const questionSlotContainer = this.scene.add.container(slotX, slotY).setSize(slotWidth, slotHeight);
-                container.add(questionSlotContainer);
-
-                // ✅ --- ADDITION: Create a background for the question slot ---
-                const bg = this.scene.add.graphics();
-                bg.fillStyle(Phaser.Display.Color.HexStringToColor(config.colors.panel).color, 0.7);
-                bg.lineStyle(2, Phaser.Display.Color.HexStringToColor(config.colors.panelBorder).color, 1);
-                // Add padding inside the slot
-                const padding = 5;
-                bg.fillRoundedRect(padding, padding, slotWidth - 2 * padding, slotHeight - 2 * padding, 10);
-                bg.strokeRoundedRect(padding, padding, slotWidth - 2 * padding, slotHeight - 2 * padding, 10);
-                questionSlotContainer.addAt(bg, 0); // Add background behind other elements
-                
-                const answerIndex = this.answerBlockQuestions.findIndex(q => q.target === questionData.target);
-                const frameName = `piece_${answerIndex % this.puzzleCols}-${Math.floor(answerIndex / this.puzzleCols)}`;
-                const pieceContainer = this.scene.add.container(0, 0);
-                const puzzlePiece = this.scene.add.image(0, 0, 'puzzle1', frameName);
-                
-                const maxPieceDim = Math.min(slotWidth, slotHeight) * 0.5;
-                const scale = maxPieceDim / Math.max(puzzlePiece.width, puzzlePiece.height);
-                puzzlePiece.setScale(scale);
-                pieceContainer.add(puzzlePiece);
-                pieceContainer.setSize(puzzlePiece.displayWidth, puzzlePiece.displayHeight);
-
-                const text = this.scene.add.text(0, 0, `${toBangla(questionData.a)} × ${toBangla(questionData.b)} =`, {
-                    fontSize: `${Math.max(16, Math.min(28, slotWidth * 0.2))}px`,
-                    fontFamily: '"Noto Sans Bengali", sans-serif',
-                    fill: config.colors.text,
-                    fontStyle: 'bold'
-                }).setOrigin(0.5);
-                questionSlotContainer.add(text);
-                
-                text.setPosition(slotWidth / 2, slotHeight * 0.3);
-                pieceContainer.setPosition(slotWidth / 2, slotHeight * 0.7);
-                
-                questionSlotContainer.add(pieceContainer);
-                
-                const pieceWorldMatrix = pieceContainer.getWorldTransformMatrix();
-                const piecePlaceholderPos = this.vizContainer.getLocalPoint(pieceWorldMatrix.tx, pieceWorldMatrix.ty);
-
-                this.vizContainer.add(pieceContainer);
-                pieceContainer.setPosition(piecePlaceholderPos.x, piecePlaceholderPos.y);
-                
-                pieceContainer.setData({
-                    questionData: questionData,
-                    originalX: piecePlaceholderPos.x,
-                    originalY: piecePlaceholderPos.y,
-                    isPlaced: false,
-                });
-                pieceContainer.setInteractive({ draggable: true, useHandCursor: true });
-                
-                this.draggablePieces.push(pieceContainer);
-                questionIndex++;
-            }
-        });
     }
-
 
     setupDragAndDrop() {
         this.scene.input.on('dragstart', (pointer, gameObject) => {
@@ -272,12 +196,17 @@ class PuzzleQuestion extends Question {
             if (!dropped && !gameObject.getData('isPlaced')) this.returnPieceToHome(gameObject);
         });
     }
-
     handleCorrect(points, feedbackText) {
         const streakBonus = this.gameState.streak * config.points.streakBonus;
         this.gameState.totalBonus += streakBonus;
+
         this.gameState.score = Math.max(0, this.gameState.score + points);
+        
+        // --- FIX: Directly increment the correct count ---
+        // This bypasses the faulty 'hasBeenAnsweredCorrectly' check from the parent class,
+        // which is not suitable for multi-part questions like this puzzle.
         this.gameState.correctCount++;
+
         this.gameState.streak++;
         this.callbacks.onCorrect(points, feedbackText);
         this.callbacks.onScoreChange(this.gameState.score);
@@ -290,13 +219,15 @@ class PuzzleQuestion extends Question {
         dropZone.setData('isFilled', true);
         piece.disableInteractive();
         gameState.questionCount++;
-
+        // NEW: Log the response.
         const questionData = piece.getData('questionData');
         this.gameState.performanceTracker.logResponse(questionData.a, questionData.b, 0, true);
 
+        // NEW: Calculate partial score (Base + Streak)
         const baseScore = 10 + Math.floor(questionData.target / 5);
         const streakBonus = gameState.streak * 3;
         const points = baseScore + streakBonus;
+
 
         this.handleCorrect(points, "সঠিক!");
         this.correctlyPlacedPieces++;
@@ -306,14 +237,20 @@ class PuzzleQuestion extends Question {
         const targetPos = this.vizContainer.getLocalPoint(zoneWorldMatrix.tx + visualBlock.width / 2, zoneWorldMatrix.ty + visualBlock.height / 2);
         const targetScale = Math.min(visualBlock.width / piece.width, visualBlock.height / piece.height);
 
+        // ✅ --- MODIFICATION 1: Animate the Answer Text ---
         const textToAnimate = visualBlock.getData('text');
         
+        // Get text's current world position
         const textWorldPos = textToAnimate.getWorldTransformMatrix();
+        // Move it to the top-level container to animate in the global space
         visualBlock.remove(textToAnimate);
         this.vizContainer.add(textToAnimate);
+        // Set its position to where it was
         const textStartPos = this.vizContainer.getLocalPoint(textWorldPos.tx, textWorldPos.ty);
         textToAnimate.setPosition(textStartPos.x, textStartPos.y);
     
+    
+           
         const emitter = this.scene.add.particles(400, 300, 'particle', {
             tint: [ 0xff0000, 0xff7700 ],
             blendMode: 'ADD',
@@ -323,34 +260,30 @@ class PuzzleQuestion extends Question {
             stopAfter: 32
         });
         this.vizContainer.add(emitter);
-        emitter.setPosition(textWorldPos.x, textWorldPos.y);
-        emitter.startFollow(textToAnimate);
 
-        // ✅ --- FIX: Animate text back, then fade it out before destroying ---
+        emitter.setPosition(textWorldPos.x, textWorldPos.y);
+
+  
+
+
+      
+
+        // Animate the text towards the piece's final destination
         this.scene.tweens.add({
             targets: textToAnimate,
-            x:  piece.getData('originalX'),
-            y:  piece.getData('originalY'),
+            x:  piece.initposition.x,
+            y:  piece.initposition.y,
             alpha: 1,
             scale: 0.8,
             duration: 300,
             ease: 'Power2.easeIn',
-            onComplete: () => {
-                // After it arrives, start a new tween to fade it out gracefully
-                this.scene.tweens.add({
-                    targets: textToAnimate,
-                    scale: 1.2,
-                    duration: 300,
-                    ease: 'Power1',
-                    // onComplete: () => {
-                    //     textToAnimate.destroy(); // Destroy it only after it has faded
-                    // }
-                });
-            }
+            onComplete: (console.log('text animation complete',textToAnimate))
         });
-
+               emitter.startFollow(textToAnimate);
+        // Only fade out the background of the visual block now
         this.scene.tweens.add({ targets: visualBlock.getData('bg'), alpha: 0, duration: 200 });
         
+        // Animate the piece over the top of the visual block
         this.scene.tweens.add({
             targets: piece,
             x: targetPos.x,
@@ -384,13 +317,19 @@ class PuzzleQuestion extends Question {
         this.completeSet(false);
     }
 
+// js/questions/PuzzleQuestion.js
+
     completeSet(success = false) {
         if (!gameState.gameActive && !this.isProcessing) return;
         gameState.gameActive = false;
         this.isProcessing = true;
         this.scene.stopQuestionTimer();
         this.draggablePieces.forEach(p => p.disableInteractive());
+
+        // --- FIX: Determine the feedback STRING ---
         const feedbackText = success ? "স্টেজ সম্পূর্ণ!" : "সময় শেষ! আবার চেষ্টা করুন।";
+        
+        // Pass the string to the callback
         this.callbacks.onCompleteSet(feedbackText, success);
     }
 

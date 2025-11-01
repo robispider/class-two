@@ -6,6 +6,7 @@ import { createBackgroundDecorations, toBangla } from '../utils.js';
 import { config, avatars } from '../config.js';
 import { gameState } from '../gameState.js';
 import GameplayController from '../GameplayController.js';
+import { loadedAssetKeys, assetManifest } from '../AssetManager.js';
 
 // --- UI Layout Constants ---
 const MAIN_BUTTON_SCALE = 0.4;
@@ -35,16 +36,49 @@ class StartScreenScene extends Phaser.Scene {
 
     create() {
         this.leaderboardComponent = new LeaderboardComponent(this);
+//  this.load.audio("game-start-menu","assets/sounds/game-start-menu.mp3");
+const testSound = this.sound.add('game-start-menu', { loop: true, volume: 1 });
 
-        this.music = this.sound.add('game-start-menu', { loop: true, volume: 0.4 });
-         this.input.once('pointerdown', () => {
-            if (this.sound.context.state === 'suspended') {
-                this.sound.context.resume();
-            }
-            if (this.music && !this.music.isPlaying) {
-                this.music.play();
-            }
-        }, this);
+// Check if file was actually loaded
+if (!testSound || !testSound.key) {
+    console.error('Sound key missing!');
+}
+
+// Listen for decode success/failure
+testSound.on('loaderror', () => {
+    console.error('DECODE FAILED for game-start-menu.mp3');
+});
+testSound.on('decoded', () => {
+    console.log('DECODED SUCCESSFULLY');
+});
+
+console.log('game-start-menu exists?',this.cache.audio.exists('game-start-menu')); 
+
+   
+
+console.log('music created – using HTML5 Audio');
+
+    // First gesture: Resume (for any WebAudio remnants) + play
+    this.input.once('pointerdown', () => {
+    console.log('First click – resuming context (if needed)');
+    this.sound.unlock();
+     this.music = this.sound.add('game-start-menu', { loop: true, volume: 0.4 });
+    this.userHasInteracted = true; // ADD THIS
+
+    if (this.sound.context && this.sound.context.state === 'suspended') {
+        this.sound.context.resume();
+    }
+
+    if (this.music && !this.music.isPlaying) {
+        const played = this.music.play();
+        console.log('music.play() returned:', played, 'isPlaying:', this.music.isPlaying);
+        if (this.music._sound && this.music._sound.readyState >= 2) {
+            console.log('HTML5 audio ready and playing');
+        } else {
+            console.warn('HTML5 audio not ready – check file');
+        }
+    }
+}, this);
 
         const { width, height } = this.cameras.main;
 
@@ -68,7 +102,90 @@ class StartScreenScene extends Phaser.Scene {
             userModal.show();
         }
     }
-    
+
+ // --------------------------------------------------------------
+    //  Resume AudioContext → Load audio → Decode → Play
+    // --------------------------------------------------------------
+    async resumeAndLoadAudio() {
+        // 1. Resume the AudioContext
+        if (this.sound.context.state === 'suspended') {
+            await this.sound.context.resume();
+            console.log('AudioContext resumed');
+        }
+
+        // 2. Load the *menu* audio files (now the context is running)
+        const menuAudio = assetManifest.menu.filter(a => a.type === 'audio');
+        for (const a of menuAudio) {
+            if (!loadedAssetKeys.has(a.key)) {
+                this.load.audio(a.key, a.path);
+                loadedAssetKeys.add(a.key);
+            }
+        }
+
+        // If nothing to load, decode what we already have (should be none)
+        if (menuAudio.length === 0) {
+            this.startMusic();
+            return;
+        }
+
+        // 3. Start the loader (it will fire 'complete' when done)
+        this.load.once('complete', () => {
+            this.decodeMenuAudioAndPlay();
+        });
+
+        this.load.start(); // <-- important!
+    }
+
+    // --------------------------------------------------------------
+    //  Decode every loaded menu audio file
+    // --------------------------------------------------------------
+    decodeMenuAudioAndPlay() {
+        const keys = assetManifest.menu
+            .filter(a => a.type === 'audio')
+            .map(a => a.key);
+
+        const toDecode = keys
+            .map(key => {
+                const data = this.cache.audio.get(key);
+                if (data instanceof ArrayBuffer) return { key, data };
+                console.warn(`No ArrayBuffer for ${key} – skipping`);
+                return null;
+            })
+            .filter(Boolean);
+
+        if (toDecode.length === 0) {
+            console.warn('Nothing to decode – using HTML5 fallback (no WebAudio sound)');
+            this.startMusic(); // will still work with HTML5
+            return;
+        }
+
+        console.log(`Decoding ${toDecode.length} WebAudio file(s)…`);
+        this.sound.decodeAudio(toDecode);
+
+        this.sound.once('decodedall', () => {
+            console.log('All menu audio decoded');
+            keys.forEach(k => {
+                const s = this.sound.get(k);
+                console.log(`${k} → isDecoded:${s.isDecoded} duration:${s.duration}`);
+            });
+            this.startMusic();
+        });
+    }
+
+    // --------------------------------------------------------------
+    //  Create the music object and play it
+    // --------------------------------------------------------------
+    startMusic() {
+        if (this.music) return; // already created
+
+        this.music = this.sound.add('game-start-menu', { loop: true, volume: 0.4 });
+        console.log('music object created – isDecoded?', this.music.isDecoded);
+
+        if (!this.music.isPlaying) {
+            const ok = this.music.play();
+            console.log('music.play() returned:', ok);
+        }
+    }
     // REMOVED: createUserSelectionMenu and selectUser are now inside the component.
 
       createCurrentUserDisplay() {
@@ -100,6 +217,9 @@ class StartScreenScene extends Phaser.Scene {
         
         // --- NEW: Avatar click handler ---
         avatar.on('pointerdown', () => {
+             if (this.sound.context.state === 'suspended') {
+                this.sound.context.resume();
+            }
             const avatarModal = new AvatarSelectionComponent(this, user, (newAvatar) => {
                 // This is the onSave callback
                 gameState.userManager.updateUserAvatar(user.name, newAvatar);
@@ -198,6 +318,31 @@ class StartScreenScene extends Phaser.Scene {
         } else if (this.stageButtons[0]) {
             this.updateSelectionEffect('stage', this.stageButtons[0], 1, true);
         }
+        //   this._startBackgroundLoading();
+    }
+ /**
+     * NEW METHOD
+     * Silently starts loading all game assets in the background.
+     */
+    _startBackgroundLoading() {
+        console.log("StartScreen: Starting background asset loading...");
+
+        this.load.once('complete', () => {
+            console.log("StartScreen: Background asset loading complete!");
+        });
+
+        for (const groupName in assetManifest) {
+            if (groupName === 'menu') continue; // Skip menu assets, they are already loaded
+            const assets = assetManifest[groupName];
+            for (const asset of assets) {
+                if (!loadedAssetKeys.has(asset.key)) {
+                    this.load[asset.type](asset.key, asset.path, asset.options);
+                    loadedAssetKeys.add(asset.key);
+                }
+            }
+        }
+        
+        this.load.start();
     }
 
     // ... (The rest of the file: shutdown, createMenuPanel, addHoverEffects, createMainButton, createMenuButton, createLevelMenu, createStageMenu, updateSelectionEffect, startGame, startPractice) remains exactly the same as your "fixed" version.
@@ -219,7 +364,11 @@ class StartScreenScene extends Phaser.Scene {
 
     addHoverEffects(button, helpString) {
         button.on('pointerover', () => {
-            this.sound.play('button-hover', { volume: 0.7 });
+             if (this.sound.context && this.sound.context.state != 'suspended') {
+         this.sound.play('button-hover', { volume: 0.7 });
+    }
+                        // console.log('sound context hover',this.sound.context.state);
+          
             const target = button instanceof Phaser.GameObjects.Container ? button.getAt(0) : button;
             target.setTint(0xDDDDDD);
             if(this.helpText) this.helpText.setText(helpString);
@@ -374,11 +523,19 @@ class StartScreenScene extends Phaser.Scene {
         if (this.music && this.music.isPlaying) {
             this.music.stop();
         }
-        this.scene.start('GameScene', {
-            mode: 'stage',
-            level: gameState.currentLevel,
-            stage: gameState.currentStage,
-            allowedTables: gameState.controller.levels[gameState.currentLevel - 1]
+            // --- LAUNCH THE LOADER SCENE ---
+        this.scene.start('LoaderScene', {
+            // Tell it which assets to load for the main game
+            assetGroups: ['common', 'standard', 'puzzle', 'shooting'],
+            // Tell it which scene to go to after loading
+            targetScene: 'GameScene',
+            // Pass along the game data
+            gameData: {
+                mode: 'stage',
+                level: gameState.currentLevel,
+                stage: gameState.currentStage,
+                allowedTables: gameState.controller.levels[gameState.currentLevel - 1]
+            }
         });
     }
 
@@ -386,7 +543,14 @@ class StartScreenScene extends Phaser.Scene {
         if (this.music && this.music.isPlaying) {
             this.music.stop();
         }
-        this.scene.start('PracticeScene');
+          this.scene.start('LoaderScene', {
+            assetGroups: ['common', 'standard'], // Practice mode only needs these
+            targetScene: 'PracticeScene',
+            gameData: {
+                mode: 'practice'
+                // PracticeScene will handle picking the table
+            }
+        });
     }
 }
 

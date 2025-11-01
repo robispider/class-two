@@ -16,9 +16,145 @@ class StandardQuestion extends Question {
 
         // This array will hold references to all major GameObjects created by this question
         // to ensure they are all properly destroyed during cleanup.
-        this.createdObjects = [];
+        // this.createdObjects = [];
+             this.persistentObjects = []; // UI that lasts for the whole stage (panels, containers)
+        this.transientObjects = [];  // UI for a single question (items, text, buttons)
+
+        this.vizContainer = null;
+        this.questionContainer = null;
+        this.answerContainer = null;
+        this.music = null;
+    }
+   /**
+     * Overrides the parent method. Now sets up the persistent UI once,
+     * then displays the first question.
+     */
+    startQuestionSet() {
+        if (!this.music || !this.music.isPlaying) {
+            this.music = this.scene.sound.add('practice-music-loop', { loop: true, volume: 0.4 });
+            this.music.play();
+        }
+        this.gameState.questionCount = 0;
+        this.gameState.correctCount = 0;
+        this.gameState.score = 0;
+        
+        this.setupPersistentUI();    // Create the panels and containers once.
+        this.displayNextQuestion();  // Display the first question.
+    }
+    /**
+     * NEW METHOD: This runs only ONCE per stage to create the static background
+     * and layout containers that will be reused for every question.
+     */
+    setupPersistentUI() {
+        const qaRegion = this.scene.qaRegion;
+
+        // 1. Create the main visualization background panel.
+        const vizPanelHeight = qaRegion.height * 0.7;
+        const panelPadding = 20;
+        const panelW = qaRegion.width - 2 * panelPadding;
+        const panelH = vizPanelHeight - 2 * panelPadding;
+
+        const vizPanel = this.scene.add.graphics();
+        vizPanel.fillStyle(Phaser.Display.Color.HexStringToColor(config.colors.panel).color, 0.8);
+        vizPanel.lineStyle(10, Phaser.Display.Color.HexStringToColor(config.colors.panelBorder).color, 1);
+        vizPanel.fillRoundedRect(panelPadding, panelPadding, panelW, panelH, 30);
+        vizPanel.strokeRoundedRect(panelPadding, panelPadding, panelW, panelH, 30);
+        qaRegion.add(vizPanel);
+        this.persistentObjects.push(vizPanel);
+
+        // 2. Create the main layout containers that will hold the content.
+        this.vizContainer = this.scene.add.container(0, 0).setSize(qaRegion.width, qaRegion.height * 0.7);
+        this.questionContainer = this.scene.add.container(0, this.vizContainer.height).setSize(qaRegion.width, qaRegion.height * 0.1);
+        this.answerContainer = this.scene.add.container(0, this.vizContainer.height + this.questionContainer.height).setSize(qaRegion.width, qaRegion.height * 0.2);
+
+        qaRegion.add([this.vizContainer, this.questionContainer, this.answerContainer]);
+        this.persistentObjects.push(this.vizContainer, this.questionContainer, this.answerContainer);
+    }
+    
+    /**
+     * MODIFIED: This is the new main loop, replacing the old setup().
+     * It runs for EVERY question to clear old content and display new content.
+     */
+    displayNextQuestion() {
+        // Clear only the content (transient objects) from the previous question.
+        this.transientObjects.forEach(obj => obj.destroy());
+        this.transientObjects = [];
+
+        // Generate new question data.
+        this.questionData = this.generateQuestionData();
+        const { a, b } = this.questionData;
+        gameState.currentA = a;
+        gameState.currentB = b;
+        gameState.currentAnswer = a * b;
+
+        gameState.gameActive = true;
+        if (gameState.timingModel === 'per-question') {
+            this.scene.startQuestionTimer(this.timeLimit);
+        }
+
+        const randomItemIndex = rand(0, config.assets.count - 1);
+        const currentItemName = config.assets.itemNames[randomItemIndex];
+
+        let type = (gameState.currentStage === 1) ? 'standard' : 'partial';
+        // if (type === 'partial' && (a === 1 || b === 1)) {
+        //     type = 'standard'; // Override for simple cases
+        // }
+        gameState.questionType = type;
+
+        const titleText = (type === 'standard')
+            ? `কতগুলি ${currentItemName} দেখা যাচ্ছে?`
+            : `সব বাক্সে একই সংখ্যক ${currentItemName} আছে। মোট কতগুলি ${currentItemName} আছে?`;
+
+        // --- Populate the persistent containers with NEW transient content ---
+
+        const questionTitle = this.scene.add.text(this.questionContainer.width / 2, this.questionContainer.height / 2, titleText, { fontSize: '32px', fontFamily: '"Noto Sans Bengali", sans-serif', fill: config.colors.text, fontStyle: 'bold', align: 'center', wordWrap: { width: this.questionContainer.width - 40 } }).setOrigin(0.5);
+        this.questionContainer.add(questionTitle);
+        this.transientObjects.push(questionTitle);
+
+        const equationText = (type === 'partial') ? `${toBangla(a)} × ☐ = ?` : `${toBangla(a)} × ${toBangla(b)} = ?`;
+        const explicitTextLabel = this.scene.add.text(this.answerContainer.width * 0.25, this.answerContainer.height / 2, equationText, { fontSize: '60px', fontFamily: '"Noto Sans Bengali", sans-serif', fill: config.colors.text, fontStyle: 'bold', align: 'center' }).setOrigin(0.5);
+        this.answerContainer.add(explicitTextLabel);
+        this.transientObjects.push(explicitTextLabel);
+
+        this.createVisualization(this.vizContainer, a, b, type, randomItemIndex);
+
+        const optionsContainer = this.scene.add.container(this.answerContainer.width * 0.65, this.answerContainer.height / 2);
+        this.answerContainer.add(optionsContainer);
+        this.transientObjects.push(optionsContainer);
+
+        const options = this.generateOptions(gameState.currentAnswer);
+        const optionColors = shuffle([config.colors.option1, config.colors.option2, config.colors.option3, config.colors.option4]);
+        const buttonWidth = 110, buttonHeight = 60, spacing = 20;
+        const totalButtonWidth = (options.length * buttonWidth) + ((options.length - 1) * spacing);
+
+        options.forEach((opt, index) => {
+            const x = (index * (buttonWidth + spacing)) - (totalButtonWidth / 2) + buttonWidth / 2;
+            const buttonBg = this.scene.add.rectangle(0, 0, buttonWidth, buttonHeight, Phaser.Display.Color.HexStringToColor(optionColors[index]).color).setStrokeStyle(4, Phaser.Display.Color.HexStringToColor(config.colors.panelBorder).color).setOrigin(0.5);
+            const buttonText = this.scene.add.text(0, 0, toBangla(opt), { fontSize: '36px', fontFamily: '"Noto Sans Bengali", sans-serif', fill: config.colors.text, fontStyle: 'bold' }).setOrigin(0.5);
+            const button = this.scene.add.container(x, 0, [buttonBg, buttonText]).setSize(buttonWidth, buttonHeight).setInteractive({ useHandCursor: true });
+            button.answerValue = opt;
+            optionsContainer.add(button);
+            button.on('pointerdown', () => { if (gameState.gameActive) { this.scene.sound.play('button-click'); this.checkAnswer(opt, optionsContainer); }});
+            button.on('pointerover', () => { this.scene.sound.play('button-hover', { volume: 0.7 }); this.scene.tweens.add({ targets: button, scale: 1.05, duration: 150, ease: 'Sine.easeInOut' }); });
+            button.on('pointerout', () => this.scene.tweens.add({ targets: button, scale: 1, duration: 150, ease: 'Sine.easeInOut' }));
+        });
+
+        // Animate the entrance of ONLY the new transient elements
+        this.transientObjects.forEach((obj, i) => {
+            obj.setAlpha(0).setY(obj.y + 10);
+            this.scene.tweens.add({ targets: obj, alpha: 1, y: '-=10', duration: 400, ease: 'Power2', delay: i * 50 });
+        });
     }
 
+    // Override parent's nextQuestion to call our new display method
+    nextQuestion() {
+        if (this.currentQuestionIndex >= this.numQuestions) {
+            this.completeSet();
+            return;
+        }
+        this.currentQuestionIndex++;
+        this.displayNextQuestion();
+    }
     /**
      * Sets up the entire question scene, including UI, visuals, and interactivity.
      */
@@ -45,11 +181,27 @@ class StandardQuestion extends Question {
         const randomItemIndex = rand(0, config.assets.count - 1);
         const currentItemName = config.assets.itemNames[randomItemIndex];
 
-        const types = ['standard', 'partial'];
-        let type = types[Math.floor(Math.random() * types.length)];
-        if (a === 1 || b === 1) {
-            type = 'standard';
-        }
+       // --- MODIFICATION START ---
+        // Determine question type based on the stage number instead of randomly.
+        let type;
+        if (gameState.currentStage === 1) {
+            type = 'standard'; // Stage 1 is always 'standard'
+        } else {
+            type = 'partial'; // Stage 2 is always 'partial'
+        } 
+        // else {
+        //     // Fallback for any other case (e.g., if used in practice mode)
+        //     const types = ['standard', 'partial'];
+        //     type = types[Math.floor(Math.random() * types.length)];
+        // }
+
+        // IMPORTANT: Override for simple questions. A "partial" question makes no sense
+        // if there's only one group of items (b=1) or one item per group (a=1).
+        // if (a === 1 || b === 1) {
+        //     type = 'standard';
+        // }
+        // --- MODIFICATION END ---
+
         gameState.questionType = type;
 
         let titleText = (type === 'standard')
@@ -86,12 +238,24 @@ class StandardQuestion extends Question {
             { fontSize: '32px', fontFamily: '"Noto Sans Bengali", sans-serif', fill: config.colors.text, fontStyle: 'bold', align: 'center', wordWrap: { width: questionContainer.width - 40 } }
         ).setOrigin(0.5);
         questionContainer.add(questionTitle);
+ // --- MODIFICATION START ---
+        // Determine the equation text based on the question type.
+        let equationText;
+        if (type === 'partial') {
+            // For partial, show a box for 'b' to indicate it's the unknown.
+            // Using a Unicode box character for a cleaner look.
+            equationText = `${toBangla(a)} × ☐ = ?`;
+        } else {
+            // For standard, show the full equation.
+            equationText = `${toBangla(a)} × ${toBangla(b)} = ?`;
+        }
 
         const explicitTextLabel = this.scene.add.text(
-            answerContainer.width * 0.25, answerContainer.height / 2, `${toBangla(a)} × ${toBangla(b)} = ?`,
+            answerContainer.width * 0.25, answerContainer.height / 2, equationText,
             { fontSize: '60px', fontFamily: '"Noto Sans Bengali", sans-serif', fill: config.colors.text, fontStyle: 'bold', align: 'center' }
         ).setOrigin(0.5);
         answerContainer.add(explicitTextLabel);
+        // --- MODIFICATION END ---
 
         this.createVisualization(vizContainer, a, b, type, randomItemIndex);
 
@@ -140,15 +304,14 @@ class StandardQuestion extends Question {
         }
     }
 
+     // MODIFIED: Visualization groups are now transient objects
     createVisualization(container, a, b, type, itemIndex) {
         const contentW = container.width - 80;
         const contentH = container.height - 80;
         const cols = Math.min(b, 5);
         const rows = Math.ceil(b / cols);
         const spacing = 20;
-        const potentialGroupW = Math.floor((contentW - (cols - 1) * spacing) / cols);
-        const potentialGroupH = Math.floor((contentH - (rows - 1) * spacing) / rows);
-        const groupSize = Math.min(potentialGroupW, potentialGroupH, 150);
+        const groupSize = Math.min(Math.floor((contentW - (cols - 1) * spacing) / cols), Math.floor((contentH - (rows - 1) * spacing) / rows), 150);
         const totalGridW = cols * groupSize + (cols - 1) * spacing;
         const totalGridH = rows * groupSize + (rows - 1) * spacing;
         const startX = (container.width - totalGridW) / 2;
@@ -160,10 +323,10 @@ class StandardQuestion extends Question {
             const gy = startY + row * (groupSize + spacing);
             const groupContainer = this.scene.add.container(gx, gy);
             container.add(groupContainer);
+            this.transientObjects.push(groupContainer); // Add to transient array
 
             if (type === 'partial' && i > 0) {
                 groupContainer.add(this.scene.add.image(0, 0, 'box_closed').setOrigin(0,0).setDisplaySize(groupSize, groupSize));
-                
             } else {
                 groupContainer.add(this.scene.add.image(0, 0, 'box_open').setOrigin(0,0).setDisplaySize(groupSize, groupSize));
                 this.addItemsToGroup(groupContainer, a, groupSize, itemIndex);
@@ -226,24 +389,22 @@ class StandardQuestion extends Question {
     }
   handleTimeUp() {
         if (!gameState.gameActive) return;
-        // Find the options container to pass to checkAnswer
-        const answerContainer = this.createdObjects.find(c => c.width > 0 && c.height > 0 && c.list.length > 1);
-        const optionsContainer = answerContainer ? answerContainer.list.find(c => c instanceof Phaser.GameObjects.Container) : null;
-        
-        this.checkAnswer(null, optionsContainer); // Pass null for selected answer
+        // Find the options container from the transient objects
+        const answerContainer = this.transientObjects.find(c => c.list && c.list.length > 0 && c.list[0].answerValue !== undefined);
+        this.checkAnswer(null, answerContainer);
     }
     /**
      * REWRITTEN: Plays a visual animation on the buttons to give immediate feedback.
      * This version uses a flatter, more reliable sequence of tweens and callbacks.
      */
-    playFeedbackAnimation(isCorrect, selectedValue, optionsContainer) {
+      playFeedbackAnimation(isCorrect, selectedValue, optionsContainer) {
         const correctButton = optionsContainer.getAll().find(b => b.answerValue === gameState.currentAnswer);
         const selectedButton = optionsContainer.getAll().find(b => b.answerValue === selectedValue);
 
         const startTransitionOut = () => {
-            const allElements = this.createdObjects.filter(obj => obj && obj.scene);
+            // --- MODIFIED: Animate only the TRANSIENT objects ---
             this.scene.tweens.add({
-                targets: allElements,
+                targets: this.transientObjects,
                 alpha: 0,
                 scale: 0.9,
                 duration: 400,
@@ -257,8 +418,7 @@ class StandardQuestion extends Question {
                 const bg = correctButton.first;
                 const originalColor = bg.fillColor;
                 this.scene.tweens.add({
-                    targets: correctButton,
-                    scale: 1.2, yoyo: true, duration: 300, ease: 'Cubic.easeInOut',
+                    targets: correctButton, scale: 1.2, yoyo: true, duration: 300, ease: 'Cubic.easeInOut',
                     onStart: () => bg.setFillStyle(0x00ff00, 1),
                     onComplete: () => {
                         bg.setFillStyle(originalColor, 1);
@@ -277,34 +437,36 @@ class StandardQuestion extends Question {
                 const bg = selectedButton.first;
                 const originalColor = bg.fillColor;
                 this.scene.tweens.add({
-                    targets: selectedButton,
-                    x: '+=10', yoyo: true, duration: 50, repeat: 4, ease: 'Sine.easeInOut',
+                    targets: selectedButton, x: '+=10', yoyo: true, duration: 50, repeat: 4, ease: 'Sine.easeInOut',
                     onStart: () => bg.setFillStyle(0xff0000, 1),
                     onComplete: () => {
                         bg.setFillStyle(originalColor, 1);
-                        // After shake animation, show the correct answer.
                         showCorrectThenTransition();
                     }
                 });
             } else {
-                // If no button was selected (e.g. timeout), just show the correct one.
                 showCorrectThenTransition();
             }
         }
     }
 
     /**
-     * Cleans up all created GameObjects to prevent memory leaks.
+     * OVERRIDE: This is the final cleanup when the stage ends.
+     * It now destroys both persistent and transient objects.
      */
     cleanup() {
-        super.cleanup();
-                this.scene.stopQuestionTimer(); // Ensure timer is stopped on cleanup
-        this.createdObjects.reverse().forEach(obj => {
-            if (obj && obj.destroy) {
-                obj.destroy();
-            }
-        });
-        this.createdObjects = [];
+        super.cleanup(); // Stops the question timer from the parent class
+        if (this.music && this.music.isPlaying) {
+            this.music.stop();
+        }
+        
+        // Destroy all objects created by this question class
+        this.transientObjects.forEach(obj => obj.destroy());
+        this.persistentObjects.forEach(obj => obj.destroy());
+        
+        // Clear the arrays for the next stage
+        this.transientObjects = [];
+        this.persistentObjects = [];
     }
 }
 
