@@ -24,6 +24,7 @@ class StandardQuestion extends Question {
         this.questionContainer = null;
         this.answerContainer = null;
         this.music = null;
+               this.askedQuestions = new Set();
     }
    /**
      * Overrides the parent method. Now sets up the persistent UI once,
@@ -37,7 +38,8 @@ class StandardQuestion extends Question {
         this.gameState.questionCount = 0;
         this.gameState.correctCount = 0;
         this.gameState.score = 0;
-        
+             this.askedQuestions.clear();
+
         this.setupPersistentUI();    // Create the panels and containers once.
         this.displayNextQuestion();  // Display the first question.
     }
@@ -81,7 +83,27 @@ class StandardQuestion extends Question {
         this.transientObjects = [];
 
         // Generate new question data.
-        this.questionData = this.generateQuestionData();
+         // ✅ --- MODIFIED: Loop to ensure the generated question is unique ---
+        let questionData;
+        let questionKey;
+        let tries = 0;
+        const maxTries = 50; // Failsafe to prevent an infinite loop
+
+        do {
+            questionData = this.generateQuestionData();
+            // Create a unique, order-independent key (e.g., "3x7" is the same as "7x3")
+            const keyParts = [questionData.a, questionData.b].sort((x, y) => x - y);
+            questionKey = keyParts.join('x');
+            tries++;
+        } while (this.askedQuestions.has(questionKey) && tries < maxTries && this.askedQuestions.size < this.numQuestions);
+
+        if (tries >= maxTries) {
+            console.warn("Could not generate a unique question after many tries. A repeat is possible.");
+        }
+
+        this.askedQuestions.add(questionKey); // Add the new, unique question to the set
+        this.questionData = questionData;
+        // ✅ --- END OF MODIFICATION ---
         const { a, b } = this.questionData;
         gameState.currentA = a;
         gameState.currentB = b;
@@ -103,7 +125,7 @@ class StandardQuestion extends Question {
 
         const titleText = (type === 'standard')
             ? `কতগুলি ${currentItemName} দেখা যাচ্ছে?`
-            : `সব বাক্সে একই সংখ্যক ${currentItemName} আছে। মোট কতগুলি ${currentItemName} আছে?`;
+            : `প্রতিটি বাক্সে ${toBangla(a)}টি ${currentItemName} আছে। মোট কতগুলি ${currentItemName} আছে?`;
 
         // --- Populate the persistent containers with NEW transient content ---
 

@@ -6,7 +6,7 @@ class GameplayController {
     constructor() {
         this.levels = [
             [1, 2, 3, 4, 5],      // Tables for Level 1
-            [5, 6, 7, 8, 9, 10], // Tables for Level 2
+            [ 6, 7, 8, 9, 10], // Tables for Level 2
             [11, 12, 13, 14, 15], // Tables for Level 3
             [16, 17, 18, 19, 20]  // Tables for Level 4
         ];

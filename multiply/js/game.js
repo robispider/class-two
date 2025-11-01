@@ -29,6 +29,8 @@ export function startStage(scene, mode, level, allowedTables = [1, 2, 3, 4, 5]) 
     gameState.maxNumber = gameState.controller.getLevelMaxNumber(gameState.currentLevel);
     gameState.timeLimit = gameState.controller.getTimeLimit(gameState.currentStage);
     gameState.questionGenerator = new QuestionGenerator(gameState.maxNumber, gameState.performanceTracker);
+  gameState.questionGenerator.setAllLevelTables(gameState.controller.levels);
+
     gameState.score = 0;
     gameState.streak = 0;
     // gameState.totalBonus = 0;

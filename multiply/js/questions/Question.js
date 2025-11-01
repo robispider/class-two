@@ -35,11 +35,16 @@ class Question    {
     }
 
     generateQuestionData() {
-        const b = this.gameState.mode === "practice" 
+        // Correctly determine if a multiplier is fixed (only in practice mode)
+        const fixedB = this.gameState.mode === "practice" 
             ? this.allowedTables[0]
-            : this.allowedTables[Math.floor(Math.random() * this.allowedTables.length)];
+            : null; // This will be NULL in 'stage' mode
+
+        // Call the generator with the correct parameters.
+        // In stage mode, fixedB is null, allowing the adaptive logic to work.
         return this.questionGenerator.generateAdaptiveQuestion(
-            b, this.gameState.currentStage
+            fixedB, 
+            this.gameState.currentStage
         );
     }
 

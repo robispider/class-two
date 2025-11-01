@@ -1,5 +1,6 @@
 // js/QuestionGenerator.js
-import { toBangla,shuffle } from "./utils.js";
+import { toBangla, shuffle } from "./utils.js";
+import { gameState } from "./gameState.js"; // Import gameState to access the controller
 
 class QuestionGenerator {
     constructor(maxNumber, performanceTracker) {
@@ -9,7 +10,16 @@ class QuestionGenerator {
         this.lastA = null;
         this.lastB = null;
         this.lastTarget = null;
-        this.allowedTables = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]; // Default to prevent undefined
+        this.allowedTables = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+        this.allLevelTables = [];
+    }
+
+    setAllowedTables(tables) {
+        this.allowedTables = tables;
+    }
+    
+    setAllLevelTables(allTables) {
+        this.allLevelTables = allTables;
     }
 
     generateBatch(num = 50, fixedB = null, stage = 1) {
@@ -21,121 +31,115 @@ class QuestionGenerator {
     }
 
     generateAdaptiveQuestion(fixedB = null, stage = 1) {
-        // const stats = this.performanceTracker.getStatistics();
-        // let problematic = stats.problematicProblems || [];
-           let problematic = this.performanceTracker.getProblematicProblems();
-
-        let prob = 0.5 + (stage - 1) * 0.1;
-        prob = Math.min(0.8, prob);
+        let question;
+        
+        // ✅ --- THIS IS THE CRITICAL FIX ---
+        // Instead of calculating the level from 'stage', we directly use the correct
+        // global state variable, which holds the player's selected level.
+        const currentLevel = gameState.currentLevel;
 
         if (fixedB !== null) {
-            problematic = problematic.filter(key => key.split('x')[1] == fixedB);
-            prob = 0.7;
+            const a = Math.floor(Math.random() * 10) + 1;
+            return this.generateSpecificQuestion(a, fixedB);
         }
 
-        let a, b, target;
-        let tries = 0;
-        const maxFactor = 10;
-        const maxTarget = 50;
+        const problematic = this.getRelevantProblematicQuestions(currentLevel);
+        const rand = Math.random();
 
-        do {
-            if (problematic.length > 0 && Math.random() < prob) {
-                const randomProblem = problematic[Math.floor(Math.random() * problematic.length)];
-                const parts = randomProblem.split('x').map(Number);
-                a = parts[0];
-                b = parts[1];
-                if (fixedB !== null) b = fixedB;
-            } else {
-                if (fixedB !== null) {
-                    b = fixedB;
-                    a = Math.floor(Math.random() * maxFactor) + 1;
-                } else {
-                    if (Math.random() < 0.5) {
-                        b = this.allowedTables[Math.floor(Math.random() * this.allowedTables.length)];
-                        a = Math.floor(Math.random() * maxFactor) + 1;
-                    } else {
-                        a = this.allowedTables[Math.floor(Math.random() * this.allowedTables.length)];
-                        b = Math.floor(Math.random() * maxFactor) + 1;
-                    }
-                }
+        // 15% chance to get a relevant past mistake.
+        if (problematic.length > 0 && rand < 0.15) {
+            const randomProblem = problematic[Math.floor(Math.random() * problematic.length)];
+            const parts = randomProblem.split('x').map(Number);
+            question = this.generateSpecificQuestion(parts[0], parts[1]);
+        } else {
+            // 85% chance for a new question, strongly biased towards the current level.
+            const currentTables = this.allLevelTables[currentLevel - 1];
+            if (!currentTables || currentTables.length === 0) {
+                return this.generateSpecificQuestion(1, 1); // Failsafe
             }
-            target = a * b;
-            tries++;
-        } while (
-            (a === this.lastA && b === this.lastB) ||
-            target > maxTarget ||
-            tries < 5
-        );
 
-        this.lastA = a;
-        this.lastB = b;
-        this.lastTarget = target;
-        const factors = this.getFactors(target).filter(f => f <= maxFactor);
+            // The first number is ALWAYS from the current level's tables.
+            let a = currentTables[Math.floor(Math.random() * currentTables.length)];
+            let b;
 
-        const questionData = { a, b, target, factors };
-        return questionData;
+            // 75% chance for the second number to ALSO be from the current level ("pure").
+            if (currentLevel > 1 && Math.random() < 0.75) {
+                 b = currentTables[Math.floor(Math.random() * currentTables.length)];
+            } else {
+                // For Level 1, or for the 25% "mixed review" chance, pick from 1-10.
+                b = Math.floor(Math.random() * 10) + 1;
+            }
+            
+            if (Math.random() < 0.5) {
+                [a, b] = [b, a];
+            }
+
+            question = this.generateSpecificQuestion(a, b);
+        }
+
+        // Failsafe to ensure no question is null
+        if (!question) {
+            question = this.generateSpecificQuestion(1, 1);
+        }
+        
+        this.lastA = question.a;
+        this.lastB = question.b;
+        this.lastTarget = question.target;
+        
+        return question;
+    }
+
+    getRelevantProblematicQuestions(currentLevel) {
+        const currentLevelTables = this.allLevelTables[currentLevel - 1] || [];
+        const allProblematic = this.performanceTracker.getProblematicProblems();
+
+        return allProblematic.filter(key => {
+            const [a, b] = key.split('x').map(Number);
+            return currentLevelTables.includes(a) || currentLevelTables.includes(b);
+        });
     }
 
     generateSpecificQuestion(a, b) {
-        const maxFactor = 10;
         const target = a * b;
-        const factors = this.getFactors(target).filter(f => f <= maxFactor);
-        const questionData = { a, b, target, factors };
-        return questionData;
+        const factors = this.getFactors(target);
+        return { a, b, target, factors };
     }
 
     getFactors(number) {
-        const factors = [];
+        const factors = new Set();
         for (let i = 1; i <= Math.sqrt(number); i++) {
             if (number % i === 0) {
-                factors.push(i);
-                if (i !== number / i) {
-                    factors.push(number / i);
+                factors.add(i);
+                if (i * i !== number) {
+                    factors.add(number / i);
                 }
             }
         }
-        return factors.sort((a, b) => a - b);
+        return Array.from(factors).sort((a, b) => a - b);
     }
 
     generateOptions(correct, a, b) {
         const options = new Set([correct]);
-        const maxTarget = 50;
+        const maxTarget = 20 * 10; // Max possible product
         const candidates = [
-            a * (b + 1),
-            a * (b - 1),
-            (a + 1) * b,
-            (a - 1) * b,
-            correct + 1,
-            correct - 2,
-            correct + 10
-        ].filter(p => p > 0 && p <= maxTarget);
+            a * (b + 1), a * (b - 1),
+            (a + 1) * b, (a - 1) * b,
+            correct + 10, correct - 10,
+            correct + 1, correct - 1,
+        ].filter(p => p > 0 && p <= maxTarget && p !== correct);
 
-        this.shuffle(candidates);
+        shuffle(candidates);
         for (const p of candidates) {
-            if (options.size >= this.numberOfOptions) break;
-            if (!options.has(p)) {
-                options.add(p);
-            }
+            if (options.size >= 4) break;
+            options.add(p);
         }
-        while (options.size < this.numberOfOptions) {
-            const r = Math.floor(Math.random() * maxTarget) + 1;
+        while (options.size < 4) {
+            const r = Math.floor(Math.random() * Math.max(correct + 20, 40)) + 1;
             if (!options.has(r)) {
                 options.add(r);
             }
         }
-        return this.shuffle([...options]);
-    }
-
-    shuffle(array) {
-        for (let i = array.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [array[i], array[j]] = [array[j], array[i]];
-        }
-        return array;
-    }
-
-    setAllowedTables(tables) {
-        this.allowedTables = tables;
+        return shuffle([...options]);
     }
 }
 
